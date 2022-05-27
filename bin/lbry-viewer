@@ -1165,14 +1165,6 @@ sub apply_configuration {
         }
     }
 
-    if (delete $opt->{authenticate}) {
-        authenticate();
-    }
-
-    if (delete $opt->{logout}) {
-        logout();
-    }
-
     # ... OTHER OPTIONS ... #
     if (defined $opt->{extract_info_file}) {
         open my $fh, '>:utf8', delete($opt->{extract_info_file});
@@ -1456,9 +1448,6 @@ sub parse_arguments {
 
         # English-UK friendly
         'favorite|favourite|favorite-video|favourite-video|fav=s' => \$opt{favorite_video},
-
-        #'login|authenticate' => \$opt{authenticate},
-        #'logout'             => \$opt{logout},
 
         'related-videos|rv=s'         => \$opt{related_videos},
         'popular-videos|popular|pv:s' => \$opt{popular_videos},
@@ -1880,60 +1869,6 @@ sub get_user_input {
     return @{$keywords};
 }
 
-sub logout {
-
-    unlink $authentication_file
-      or warn "[!] Can't unlink: `$authentication_file' -> $!";
-
-    $yv_obj->set_access_token();
-    $yv_obj->set_refresh_token();
-
-    return 1;
-}
-
-sub authenticate {
-    my $get_code_url = $yv_obj->get_accounts_oauth_url() // return;
-
-    print <<"INFO";
-
-:: Get the authentication code: $get_code_url
-
-                            |
-... and paste it below.    \\|/
-                            `
-INFO
-
-    my $code = $term->readline(colored(q{Code: }, 'bold')) || return;
-
-    my $info = $yv_obj->oauth_login($code) // do {
-        warn "[WARNING] Can't log in... That's all I know...\n";
-        return;
-    };
-
-    if (defined $info->{access_token}) {
-
-        $yv_obj->set_access_token($info->{access_token})   // return;
-        $yv_obj->set_refresh_token($info->{refresh_token}) // return;
-
-        my $remember_me = ask_yn(prompt  => colored("\nRemember me", 'bold'),
-                                 default => 'y');
-
-        if ($remember_me) {
-            $yv_obj->set_authentication_file($authentication_file);
-            $yv_obj->save_authentication_tokens()
-              or warn "[!] Can't store the authentication tokens: $!";
-        }
-        else {
-            $yv_obj->set_authentication_file();
-        }
-
-        return 1;
-    }
-
-    warn "[WARNING] There was a problem with the authentication...\n";
-    return;
-}
-
 sub authenticated {
     if (not defined $yv_obj->get_access_token) {
         warn_needs_auth();
@@ -2173,12 +2108,6 @@ sub general_options {
     }
     elsif ($option =~ /^(?:R|refresh)\z/ and defined($url)) {
         @{$results} = @{$yv_obj->_get_results($url)->{results}};
-    }
-    elsif ($option eq 'login') {
-        authenticate();
-    }
-    elsif ($option eq 'logout') {
-        logout();
     }
     elsif ($option =~ /^(?:reset|reload|restart)\z/) {
         @ARGV = ();

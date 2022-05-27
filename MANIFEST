@@ -4,7 +4,6 @@ Build.PL
 Changes
 lib/WWW/LbryViewer.pm
 lib/WWW/LbryViewer/Activities.pm
-lib/WWW/LbryViewer/Authentication.pm
 lib/WWW/LbryViewer/Channels.pm
 lib/WWW/LbryViewer/CommentThreads.pm
 lib/WWW/LbryViewer/GetCaption.pm

@@ -11,12 +11,11 @@ tie my %youtubei_cache => 'Memoize::Expire',
   LIFETIME             => 600,                 # in seconds
   NUM_USES             => 10;
 
-memoize '_get_youtubei_content', SCALAR_CACHE => [HASH => \%youtubei_cache];
-
 #memoize('_get_video_info');
 memoize('_ytdl_is_available');
 
-#memoize('_info_from_ytdl');
+memoize('_info_from_ytdl');
+
 #memoize('_extract_from_ytdl');
 memoize('_extract_from_invidious');
 
@@ -31,7 +30,6 @@ use parent qw(
   WWW::LbryViewer::Subscriptions
   WWW::LbryViewer::PlaylistItems
   WWW::LbryViewer::CommentThreads
-  WWW::LbryViewer::Authentication
   WWW::LbryViewer::VideoCategories
 );
 
@@ -117,15 +115,12 @@ my %valid_options = (
 
     librarian_url => {valid => qr/\w/, default => 'https://lbry.bcow.xyz'},
 
+    #librarian_url => {valid => qr/\w/, default => 'https://lbry.vern.cc'},
+
 #<<<
     # No input value allowed
     api_path         => {valid => q[], default => '/api/v1/'},
-    video_info_url   => {valid => q[], default => 'https://www.youtube.com/get_video_info'},
-    oauth_url        => {valid => q[], default => 'https://accounts.google.com/o/oauth2/'},
-    video_info_args  => {valid => q[], default => '?video_id=%s&el=detailpage&ps=default&eurl=&gl=US&hl=en&html5=1&c=TVHTML5&cver=6.20180913'},
     www_content_type => {valid => q[], default => 'application/x-www-form-urlencoded'},
-    m_youtube_url    => {valid => q[], default => 'https://m.youtube.com'},
-    youtubei_url     => {valid => q[], default => 'https://youtubei.googleapis.com/youtubei/v1/%s?key=' . reverse("8Wcq11_9Y_wliCGLHETS4Q8UqlS2JF_OAySazIA")},
 #>>>
 
 #<<<
@@ -1138,71 +1133,6 @@ sub _extract_streaming_urls {
     }
 
     return @results;
-}
-
-sub _get_youtubei_content {
-    my ($self, $endpoint, $videoID, %args) = @_;
-
-    # Valid endpoints: browse, player, next
-
-    my $url = sprintf($self->get_youtubei_url(), $endpoint);
-
-    require Time::Piece;
-
-    my %android = (
-                   "videoId" => $videoID,
-                   "context" => {
-                                 "client" => {
-                                              "hl"            => "en",
-                                              "gl"            => "US",
-                                              "clientName"    => "ANDROID",
-                                              "clientVersion" => "16.20",
-                                              %args,
-                                             }
-                                },
-                  );
-
-    my %web = (
-               "videoId" => $videoID,
-               "context" => {
-                             "client" => {
-                                          "hl"            => "en",
-                                          "gl"            => "US",
-                                          "clientName"    => "WEB",
-                                          "clientVersion" => sprintf("2.%s.05.00", Time::Piece->new(time)->strftime("%Y%m%d")),
-                                          %args,
-                                         }
-                            },
-              );
-
-    local $self->{access_token} = undef;
-    my $content = $self->post_as_json($url, $endpoint eq 'next' ? \%web : \%android);
-
-    return $content;
-}
-
-sub _old_get_video_info {
-    my ($self, $videoID) = @_;
-
-    my $url     = $self->get_video_info_url() . sprintf($self->get_video_info_args(), $videoID);
-    my $content = $self->lwp_get($url, simple => 1) // return;
-    my %info    = $self->parse_query_string($content);
-
-    return %info;
-}
-
-sub _get_video_info {
-    my ($self, $videoID, %args) = @_;
-
-    my $content = $self->_get_youtubei_content('player', $videoID, %args);
-    my %info    = (player_response => $content);
-
-    return %info;
-}
-
-sub _get_video_next_info {
-    my ($self, $videoID) = @_;
-    $self->_get_youtubei_content('next', $videoID);
 }
 
 sub _make_translated_captions {

@@ -644,41 +644,7 @@ sub _get_initial_data {
 sub _channel_data {
     my ($self, $channel, %args) = @_;
 
-    state $yv_utils = WWW::LbryViewer::Utils->new();
-
-    my $url = $self->get_m_youtube_url;
-
-    if ($yv_utils->is_channelID($channel)) {
-        $url .= "/channel/$channel/$args{type}";
-    }
-    else {
-        $url .= "/c/$channel/$args{type}";
-    }
-
-    my %params = (hl => "en");
-
-    if (defined(my $sort = $args{sort_by})) {
-        if ($sort eq 'popular') {
-            $params{sort} = 'p';
-        }
-        elsif ($sort eq 'old') {
-            $params{sort} = 'da';
-        }
-    }
-
-    if (exists($args{params}) and ref($args{params}) eq 'HASH') {
-        %params = (%params, %{$args{params}});
-    }
-
-    $url = $self->_append_url_args($url, %params);
-    my $result = $self->_get_initial_data($url);
-
-    # When /c/ failed, try /user/
-    if ((!defined($result) or !scalar(keys %$result)) and $url =~ s{/c/}{/user/}) {
-        $result = $self->_get_initial_data($url);
-    }
-
-    ($url, $result);
+    # TODO: implement
 }
 
 sub _prepare_results_for_return {

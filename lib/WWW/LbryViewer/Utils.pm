@@ -408,7 +408,7 @@ sub format_text {
          : ()
         ),
 
-        URL => sub { $info->{url} // sprintf($self->{lbry_url_format}, $self->get_video_id($info)) },
+        URL => sub { sprintf($self->{lbry_url_format}, $self->get_video_id($info)) },
     );
 
     my $tokens_re = do {

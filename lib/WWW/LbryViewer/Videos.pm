@@ -182,10 +182,10 @@ sub _fallback_video_details {
             title   => $info->{fulltitle} // $info->{title},
             videoId => $id,
 
-            videoThumbnails => [
-                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
-                            @{$info->{thumbnails}}
-            ],
+            #~ videoThumbnails => [
+            #~ map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
+            #~ @{$info->{thumbnails}}
+            #~ ],
 
             liveNow       => ($info->{is_live} ? 1 : 0),
             description   => $info->{description},

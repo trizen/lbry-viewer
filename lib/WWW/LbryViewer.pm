@@ -858,7 +858,7 @@ sub _info_from_ytdl {
         push @ytdl_cmd, '--cookies', quotemeta($cookie_file);
     }
 
-    my $json = $self->proxy_stdout(@ytdl_cmd, quotemeta("https://www.youtube.com/watch?v=" . $videoID));
+    my $json = $self->proxy_stdout(@ytdl_cmd, quotemeta("https://odysee.com/" . $videoID));
     my $ref  = $self->parse_json_string($json // return);
 
     if ($self->get_debug >= 3) {

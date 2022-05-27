@@ -722,24 +722,19 @@ sub _prepare_results_for_return {
            };
 }
 
-=head2 yt_video_info($id)
+=head2 lbry_video_info($id)
 
 Get video info for a given YouTube video ID, by scrapping the YouTube C<watch> page.
 
 =cut
 
-sub yt_video_info {
+sub lbry_video_info {
     my ($self, %args) = @_;
 
-    my $url = $self->get_m_youtube_url . "/watch";
+    my $url  = $self->get_librarian_url . '/' . $args{id};
+    my $hash = $self->_get_librarian_data($url) // return;
 
-    my %params = (
-                  hl => 'en',
-                  v  => $args{id},
-                 );
-
-    $url = $self->_append_url_args($url, %params);
-    my $hash = $self->_get_initial_data($url) // return;
+    # TODO: implement it
 
     ref($hash) eq 'HASH' or return;
 
@@ -945,13 +940,13 @@ sub lbry_search_from_url {
     $self->_prepare_results_for_return(\@results, %args, url => $url);
 }
 
-=head2 yt_channel_search($channel, q => $keyword, %args)
+=head2 lbry_channel_search($channel, q => $keyword, %args)
 
 Search for videos given a keyword string (uri-escaped) from a given channel ID or username.
 
 =cut
 
-sub yt_channel_search {
+sub lbry_channel_search {
     my ($self, $channel, %args) = @_;
     my ($url, $hash) = $self->_channel_data($channel, %args, type => 'search', params => {query => $args{q}});
 
@@ -978,25 +973,25 @@ sub lbry_channel_uploads {
     $self->_prepare_results_for_return(\@results, %args, url => $url);
 }
 
-=head2 yt_channel_info($channel, %args)
+=head2 lbry_channel_info($channel, %args)
 
 Channel info (such as title) for a given channel ID or username.
 
 =cut
 
-sub yt_channel_info {
+sub lbry_channel_info {
     my ($self, $channel, %args) = @_;
     my ($url, $hash) = $self->_channel_data($channel, %args, type => '');
     return $hash;
 }
 
-=head2 yt_channel_title($channel, %args)
+=head2 lbry_channel_title($channel, %args)
 
 Exact the channel title (as a string) for a given channel ID or username.
 
 =cut
 
-sub yt_channel_title {
+sub lbry_channel_title {
     my ($self, $channel, %args) = @_;
     my ($url, $hash) = $self->_channel_data($channel, %args, type => '');
     $hash // return;
@@ -1005,13 +1000,13 @@ sub yt_channel_title {
     return $title;
 }
 
-=head2 yt_channel_id($username, %args)
+=head2 lbry_channel_id($username, %args)
 
 Exact the channel ID (as a string) for a given channel username.
 
 =cut
 
-sub yt_channel_id {
+sub lbry_channel_id {
     my ($self, $username, %args) = @_;
     my ($url, $hash) = $self->_channel_data($username, %args, type => '');
     $hash // return;
@@ -1020,13 +1015,13 @@ sub yt_channel_id {
     return $id;
 }
 
-=head2 yt_channel_created_playlists($channel, %args)
+=head2 lbry_channel_created_playlists($channel, %args)
 
 Playlists created by a given channel ID or username.
 
 =cut
 
-sub yt_channel_created_playlists {
+sub lbry_channel_created_playlists {
     my ($self, $channel, %args) = @_;
     my ($url, $hash) = $self->_channel_data($channel, %args, type => 'playlists', params => {view => 1});
 
@@ -1036,13 +1031,13 @@ sub yt_channel_created_playlists {
     $self->_prepare_results_for_return(\@results, %args, url => $url);
 }
 
-=head2 yt_channel_all_playlists($channel, %args)
+=head2 lbry_channel_all_playlists($channel, %args)
 
 All playlists for a given channel ID or username.
 
 =cut
 
-sub yt_channel_all_playlists {
+sub lbry_channel_all_playlists {
     my ($self, $channel, %args) = @_;
     my ($url, $hash) = $self->_channel_data($channel, %args, type => 'playlists');
 
@@ -1052,180 +1047,28 @@ sub yt_channel_all_playlists {
     $self->_prepare_results_for_return(\@results, %args, url => $url);
 }
 
-=head2 yt_playlist_videos($playlist_id, %args)
+=head2 lbry_playlist_videos($playlist_id, %args)
 
 Videos from a given playlist ID.
 
 =cut
 
-sub yt_playlist_videos {
+sub lbry_playlist_videos {
     my ($self, $playlist_id, %args) = @_;
 
-    my $url  = $self->_append_url_args($self->get_m_youtube_url . "/playlist", list => $playlist_id, hl => "en");
-    my $hash = $self->_get_initial_data($url) // return;
-
-    my @results = $self->_extract_sectionList_results($self->_find_sectionList($hash), %args, type => 'video');
-    $self->_prepare_results_for_return(\@results, %args, url => $url);
+    # TODO: implement it
 }
 
-=head2 yt_playlist_next_page($url, $token, %args)
+=head2 lbry_playlist_next_page($url, $token, %args)
 
 Load more items from a playlist, given a continuation token.
 
 =cut
 
-sub yt_playlist_next_page {
+sub lbry_playlist_next_page {
     my ($self, $url, $token, %args) = @_;
 
-    my $request_url = $self->_append_url_args($url, ctoken => $token);
-    my $hash        = $self->_get_initial_data($request_url) // return;
-
-    my @results = $self->_parse_itemSection(
-                                            eval      { $hash->{continuationContents}{playlistVideoListContinuation} }
-                                              // eval { $hash->{continuationContents}{itemSectionContinuation} },
-                                            %args
-                                           );
-
-    if (!@results) {
-        @results =
-          $self->_extract_sectionList_results(eval { $hash->{continuationContents}{sectionListContinuation} } // undef, %args);
-    }
-
-    $self->_add_author_to_results($hash, \@results, %args);
-    $self->_prepare_results_for_return(\@results, %args, url => $url);
-}
-
-sub yt_browse_next_page {
-    my ($self, $url, $token, %args) = @_;
-
-    my %request = (
-                   context => {
-                               client => {
-                                    browserName      => "Firefox",
-                                    browserVersion   => "83.0",
-                                    clientFormFactor => "LARGE_FORM_FACTOR",
-                                    clientName       => "MWEB",
-                                    clientVersion    => "2.20210308.03.00",
-                                    deviceMake       => "Generic",
-                                    deviceModel      => "Android 11.0",
-                                    hl               => "en",
-                                    mainAppWebInfo   => {
-                                                       graftUrl => $url,
-                                                      },
-                                    originalUrl        => $url,
-                                    osName             => "Android",
-                                    osVersion          => "11",
-                                    platform           => "TABLET",
-                                    playerType         => "UNIPLAYER",
-                                    screenDensityFloat => 1,
-                                    screenHeightPoints => 500,
-                                    screenPixelDensity => 1,
-                                    screenWidthPoints  => 1800,
-                                    timeZone           => "UTC",
-                                    userAgent => "Mozilla/5.0 (Android 11; Tablet; rv:83.0) Gecko/83.0 Firefox/83.0,gzip(gfe)",
-                                    userInterfaceTheme => "USER_INTERFACE_THEME_LIGHT",
-                                    utcOffsetMinutes   => 0,
-                               },
-                               request => {
-                                           consistencyTokenJars    => [],
-                                           internalExperimentFlags => [],
-                                          },
-                               user => {},
-                              },
-                   continuation => $token,
-                  );
-
-    my $content = $self->post_as_json(
-                $self->get_m_youtube_url . '/youtubei/v1/browse?key=' . _unscramble('1HUCiSlOalFEcYQSS8_9q1LW4y8JAwI2zT_qA_G'),
-                \%request) // return;
-
-    my $hash = $self->parse_json_string($content);
-
-    my $res =
-      eval    { $hash->{continuationContents}{playlistVideoListContinuation} }
-      // eval { $hash->{continuationContents}{itemSectionContinuation} }
-      // eval { {contents => $hash->{onResponseReceivedActions}[0]{appendContinuationItemsAction}{continuationItems}} }
-      // undef;
-
-    my @results = $self->_parse_itemSection($res, %args);
-
-    if (@results) {
-        push @results, $self->_parse_itemSection_nextpage($res, %args);
-    }
-
-    if (!@results) {
-        @results =
-          $self->_extract_sectionList_results(eval { $hash->{continuationContents}{sectionListContinuation} } // undef, %args);
-    }
-
-    $self->_add_author_to_results($hash, \@results, %args);
-    $self->_prepare_results_for_return(\@results, %args, url => $url);
-}
-
-=head2 yt_search_next_page($url, $token, %args)
-
-Load more search results, given a continuation token.
-
-=cut
-
-sub yt_search_next_page {
-    my ($self, $url, $token, %args) = @_;
-
-    my %request = (
-                   "context" => {
-                              "client" => {
-                                  "browserName"      => "Firefox",
-                                  "browserVersion"   => "83.0",
-                                  "clientFormFactor" => "LARGE_FORM_FACTOR",
-                                  "clientName"       => "MWEB",
-                                  "clientVersion"    => "2.20201030.01.00",
-                                  "deviceMake"       => "generic",
-                                  "deviceModel"      => "android 11.0",
-                                  "gl"               => "US",
-                                  "hl"               => "en",
-                                  "mainAppWebInfo"   => {
-                                                       "graftUrl" => "https://m.youtube.com/results?search_query=youtube"
-                                                      },
-                                  "osName"             => "Android",
-                                  "osVersion"          => "11",
-                                  "platform"           => "TABLET",
-                                  "playerType"         => "UNIPLAYER",
-                                  "screenDensityFloat" => 1,
-                                  "screenHeightPoints" => 420,
-                                  "screenPixelDensity" => 1,
-                                  "screenWidthPoints"  => 1442,
-                                  "userAgent" => "Mozilla/5.0 (Android 11; Tablet; rv:83.0) Gecko/83.0 Firefox/83.0,gzip(gfe)",
-                                  "userInterfaceTheme" => "USER_INTERFACE_THEME_LIGHT",
-                                  "utcOffsetMinutes"   => 0,
-                              },
-                              "request" => {
-                                            "consistencyTokenJars"    => [],
-                                            "internalExperimentFlags" => [],
-                                           },
-                              "user" => {}
-                   },
-                   "continuation" => $token,
-                  );
-
-    my $content = $self->post_as_json(
-                                      $self->get_m_youtube_url
-                                        . _unscramble('o/ebseky?u1ri//hvcuyta=e')
-                                        . _unscramble('1HUCiSlOalFEcYQSS8_9q1LW4y8JAwI2zT_qA_G'),
-                                      \%request
-                                     ) // return;
-
-    my $hash = $self->parse_json_string($content);
-
-    my @results = $self->_extract_sectionList_results(
-                       scalar {
-                           contents =>
-                             eval { $hash->{onResponseReceivedCommands}[0]{appendContinuationItemsAction}{continuationItems}; }
-                             // undef
-                       },
-                       %args
-    );
-
-    $self->_prepare_results_for_return(\@results, %args, url => $url);
+    # TODO: implement it
 }
 
 =head1 AUTHOR

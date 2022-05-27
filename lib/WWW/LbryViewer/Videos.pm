@@ -183,14 +183,8 @@ sub _fallback_video_details {
             videoId => $id,
 
             videoThumbnails => [
-                map {
-                    scalar {
-                            quality => 'medium',
-                            url     => $_->{url},
-                            width   => $_->{width},
-                            height  => $_->{height},
-                           }
-                } @{$info->{thumbnails}}
+                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
+                            @{$info->{thumbnails}}
             ],
 
             liveNow       => ($info->{is_live} ? 1 : 0),
@@ -201,13 +195,13 @@ sub _fallback_video_details {
             dislikeCount => $info->{dislike_count},
 
             category    => eval { $info->{categories}[0] } // $info->{category},
-            publishDate => $info->{upload_date},
+            publishDate => $info->{upload_date}            // $info->{release_date},
 
             keywords  => $info->{tags},
             viewCount => $info->{view_count},
 
             author   => $info->{channel},
-            authorId => $info->{channel_id} // $info->{uploader_id},
+            authorId => (split(/\//, $id))[0],
             rating   => $info->{average_rating},
         };
     }
@@ -225,11 +219,15 @@ sub video_details {
         say STDERR ":: Extracting video info using the fallback method...";
     }
 
+    # TODO: extract video info from the Librarian website (it would be faster)
+
+    return $self->_fallback_video_details($id, $fields);
+
     my %video_info = $self->_get_video_info($id);
     my $video = $self->parse_json_string($video_info{player_response} // return $self->_fallback_video_details($id, $fields));
 
     state %cache;
-    my $extra_info = ($cache{$id} //= $self->yt_video_info(id => $id));
+    my $extra_info = ($cache{$id} //= $self->lbry_video_info(id => $id));
 
     my $videoDetails = {};
     my $microformat  = {};
@@ -250,15 +248,9 @@ sub video_details {
         videoId => $videoDetails->{videoId},
 
         videoThumbnails => [
-            map {
-                scalar {
-                        quality => 'medium',
-                        url     => $_->{url},
-                        width   => $_->{width},
-                        height  => $_->{height},
-                       }
-            } @{$videoDetails->{thumbnail}{thumbnails}}
-        ],
+                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
+                            @{$videoDetails->{thumbnail}{thumbnails}}
+                           ],
 
         liveNow       => ($videoDetails->{isLiveContent} || (($videoDetails->{lengthSeconds} || 0) == 0)),
         description   => eval { $microformat->{description}{simpleText} } // $videoDetails->{shortDescription},
@@ -273,7 +265,7 @@ sub video_details {
         author   => $videoDetails->{author}    // $microformat->{ownerChannelName},
         authorId => $videoDetails->{channelId} // $microformat->{externalChannelId},
         rating   => $videoDetails->{averageRating},
-                  );
+    );
 
     if (defined($extra_info) and ref($extra_info) eq 'HASH') {
 

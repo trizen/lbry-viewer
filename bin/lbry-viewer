@@ -2772,14 +2772,14 @@ sub _add_channel_to_file {
 
     $channel_id // return;
     $channel_id = extract_channel_id($channel_id) // return;
-    $channel_title //= $yv_obj->channel_title_from_id($channel_id) // $channel_id;
+    $channel_title //= $channel_id; # TODO: extract channel name
 
     if (not defined($channel_title)) {
         warn "[!] Could not determine the channel name...\n";
         return;
     }
 
-    say ":: Saving channel <<$channel_title>> (id: $channel_id) to file..." if $yv_obj->get_debug;
+    say ":: Saving channel <<$channel_title>> (id: $channel_id) to file...";
 
     open(my $fh, '>>:utf8', $file) or do {
         warn "[!] Can't open file <<$file>> for appending: $!\n";

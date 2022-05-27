@@ -10,13 +10,13 @@ The application is in the early stages of development. Some functionality not im
 
 * command-line interface to LBRY.
 
-![lbry-viewer](https://user-images.githubusercontent.com/614513/97738550-6d0faf00-1ad6-11eb-84ec-d37f28073d9d.png)
+![lbry-viewer](https://user-images.githubusercontent.com/614513/170727055-edaaf1a2-b23a-4986-b293-62939378e1c8.png)
 
 ### gtk-lbry-viewer
 
 * GTK+ interface to LBRY.
 
-![gtk-lbry-viewer](https://user-images.githubusercontent.com/614513/127567550-d5742dee-593c-4167-acc4-6d80fd061ffc.png)
+![gtk-lbry-viewer](https://user-images.githubusercontent.com/614513/170727069-9273ef40-d407-40a6-8183-c26e73a7807f.png)
 
 
 ### AVAILABILITY

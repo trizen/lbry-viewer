@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=GTK Lbry Viewer
+Version=1.0
+Comment=Search and play LBRY videos.
+Exec=gtk-lbry-viewer
+Icon=gtk-lbry-viewer
+StartupNotify=false
+Terminal=false
+Type=Application
+Categories=AudioVideo;GTK;

@@ -1,0 +1,4164 @@
+#!/usr/bin/perl
+
+# Copyright (C) 2010-2022 Trizen <echo dHJpemVuQHByb3Rvbm1haWwuY29tCg== | base64 -d>.
+#
+# This program is free software; you can redistribute it and/or modify it
+# under the terms of either: the GNU General Public License as published
+# by the Free Software Foundation; or the Artistic License.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+#
+# See https://dev.perl.org/licenses/ for more information.
+#
+#-------------------------------------------------------
+#  GTK Lbry Viewer
+#  Fork: 27 May 2022
+#  Edit: 27 May 2022
+#  https://github.com/trizen/lbry-viewer
+#-------------------------------------------------------
+
+# This is a fork of pipe-viewer:
+#   https://github.com/trizen/pipe-viewer
+
+use utf8;
+use 5.016;
+
+use warnings;
+no warnings 'once';
+
+my $DEVEL;                                           # true in devel mode
+use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel only
+
+use WWW::LbryViewer v0.0.1;
+use WWW::LbryViewer::RegularExpressions;
+
+use Gtk3 qw(-init);
+use File::Spec::Functions qw(
+  rel2abs
+  catdir
+  catfile
+  curdir
+  updir
+  path
+  tmpdir
+  file_name_is_absolute
+);
+
+require Storable;
+binmode(STDOUT, ':utf8');
+
+my $appname = 'GTK+ Lbry Viewer';
+my $version = $WWW::LbryViewer::VERSION;
+
+# Saved and subscribed channels
+my %channels;
+my %subscribed_channels;
+
+# Share directory
+my $share_dir =
+  ($DEVEL and -d "../share")
+  ? '../share'
+  : do { require File::ShareDir; File::ShareDir::dist_dir('WWW-LbryViewer') };
+
+# Configuration dir/file
+my $home_dir;
+my $xdg_config_home = $ENV{XDG_CONFIG_HOME};
+
+if ($xdg_config_home and -d -w $xdg_config_home) {
+    require File::Basename;
+    $home_dir = File::Basename::dirname($xdg_config_home);
+
+    if (not -d -w $home_dir) {
+        $home_dir = $ENV{HOME} || curdir();
+    }
+}
+else {
+    $home_dir =
+         $ENV{HOME}
+      || $ENV{LOGDIR}
+      || ($^O eq 'MSWin32' ? '\Local Settings\Application Data' : ((getpwuid($<))[7] || `echo -n ~`));
+
+    if (not -d -w $home_dir) {
+        $home_dir = curdir();
+    }
+
+    $xdg_config_home = catdir($home_dir, '.config');
+}
+
+# Configuration dirs
+my $config_dir          = catdir($xdg_config_home, 'lbry-viewer');
+my $local_playlists_dir = catdir($config_dir,      'playlists');
+
+# Config files
+my $config_file              = catfile($config_dir, "gtk-lbry-viewer.conf");
+my $youtube_users_file       = catfile($config_dir, 'users.txt');
+my $subscribed_channels_file = catfile($config_dir, 'subscribed_channels.txt');
+my $history_file             = catfile($config_dir, 'gtk-history.txt');
+my $session_file             = catfile($config_dir, 'session.dat');
+my $watched_file             = catfile($config_dir, 'watched.txt');
+
+# Special local playlists
+my $watch_history_data_file       = catfile($local_playlists_dir, 'watched_videos.dat');
+my $liked_videos_data_file        = catfile($local_playlists_dir, 'liked_videos.dat');
+my $disliked_videos_data_file     = catfile($local_playlists_dir, 'disliked_videos.dat');
+my $favorite_videos_data_file     = catfile($local_playlists_dir, 'favorite_videos.dat');
+my $subscription_videos_data_file = catfile($local_playlists_dir, "subscriptions.dat");
+
+# Create the configuration directory
+foreach my $dir ($config_dir, $local_playlists_dir) {
+    if (not -d $dir) {
+        require File::Path;
+        eval { File::Path::make_path($dir) }
+          or warn "[!] Can't create dir <<$dir>>: $!";
+    }
+}
+
+# Create the special playlist files
+foreach my $file ($watch_history_data_file, $liked_videos_data_file, $disliked_videos_data_file, $favorite_videos_data_file,) {
+    if (not -s $file) {
+        Storable::store([], $file);
+    }
+}
+
+# Video queue for the enqueue feature
+my @VIDEO_QUEUE;
+
+# Keep track of watched videos
+my %WATCHED_VIDEOS;
+
+sub which_command {
+    my ($cmd) = @_;
+
+    if (file_name_is_absolute($cmd)) {
+        return $cmd;
+    }
+
+    state $paths = [path()];
+    foreach my $path (@{$paths}) {
+        if (-e (my $cmd_path = catfile($path, $cmd))) {
+            return $cmd_path;
+        }
+    }
+    return;
+}
+
+my %symbols = (
+               thumbs_up   => '👍',
+               thumbs_down => '👎',
+               type        => '💡',
+               author      => '😃',
+               author_id   => '🤖',
+               average     => '📊',
+               category    => '🗃️',
+               play        => '▶️',
+               views       => '👀',
+               heart       => '❤️',
+               published   => '⏱️',
+               updated     => '✨',
+               numero      => '#️⃣',
+               video       => '🎞️',
+               subs        => '👪',
+              );
+
+# Main configuration
+my %CONFIG = (
+
+    # Combobox values
+    active_resolution_combobox          => 0,
+    active_more_options_expander        => 0,
+    active_panel_account_combobox       => 0,
+    active_channel_type_combobox        => 0,
+    active_subscriptions_order_combobox => 0,
+
+    video_players => {
+                      vlc => {
+                              cmd => q{vlc},
+                              srt => q{--sub-file=*SUB*},
+                              fs  => q{--fullscreen},
+                              arg => q{--quiet --play-and-exit --no-video-title-show --input-title-format=*TITLE* *URL*},
+                             },
+                      mpv => {
+                              cmd => q{mpv},
+                              srt => q{--sub-file=*SUB*},
+                              fs  => q{--fullscreen},
+                              arg => q{--really-quiet --force-media-title=*TITLE* --no-terminal *URL*},
+                             },
+                     },
+    video_player_selected => undef,    # autodetect it later
+
+    # GUI options
+    clear_text_entries_on_click => 0,
+    show_thumbs                 => 1,
+    clear_search_list           => 1,
+    default_notebook_page       => 1,
+    mainw_size                  => '700x400',
+    mainw_maximized             => 0,
+    mainw_fullscreen            => 0,
+    mainw_centered              => 0,
+    hpaned_width                => 250,
+    hpaned_position             => 420,
+
+    # LBRY options
+    split_videos     => 1,
+    dash             => 1,        # may load slow
+    prefer_mp4       => 0,
+    prefer_av1       => 0,
+    ignore_av1       => 0,
+    prefer_m4a       => 0,
+    prefer_invidious => 0,
+    force_fallback   => 0,
+    maxResults       => 10,
+    hfr              => 1,        # true to prefer high frame rate (HFR) videos
+    resolution       => 'best',
+    videoDimension   => undef,
+    videoLicense     => undef,
+    region           => undef,
+
+    comments_width => 80,         # wrap comments longer than `n` characters
+    comments_order => 'top',      # valid values: time, relevance
+
+    # API
+    api_host => "auto",
+
+    # URI options
+    thumbnail_type    => 'medium',
+    lbry_video_url    => 'https://open.lbry.com/%s',
+    lbry_playlist_url => 'https://open.lbry.com/%s',
+    lbry_channel_url  => 'https://open.lbry.com/%s',
+
+    # Subtitle options
+    srt_languages => ['en', 'es'],
+    get_captions  => 1,
+    auto_captions => 0,
+    cache_dir     => undef,          # will be defined later
+
+    # Others
+    env_proxy   => 1,
+    http_proxy  => undef,
+    timeout     => undef,
+    user_agent  => undef,
+    cookie_file => undef,
+    prefer_fork => (($^O eq 'linux') ? 0 : 1),
+    debug       => 0,
+    fullscreen  => 0,
+    audio_only  => 0,
+
+    autoscroll_to_end => 0,
+    single_click_play => 0,
+
+    # yt-dlp / youtube-dl support
+    ytdl     => 1,
+    ytdl_cmd => undef,    # auto-detect
+
+    # yt-dlp comment options
+    ytdlp_comments     => 0,
+    ytdlp_max_comments => 20,
+    ytdlp_max_replies  => 3,
+
+    tooltips        => 1,
+    tooltip_max_len => 512,    # max length of description in tooltips
+
+    thousand_separator => q{,},
+    downloads_dir      => curdir(),
+    web_browser        => undef,        # defaults to $ENV{WEBBROWSER} or xdg-open
+    terminal           => undef,        # autodetect it later
+    terminal_exec      => q{-e '%s'},
+    lbry_viewer        => undef,
+    lbry_viewer_args   => [],
+
+    bypass_age_gate_with_proxy => 0,
+    ignored_projections        => [],
+
+    # Watch history
+    watch_history => 1,
+    watched_file  => $watched_file,
+
+    # Subscribed channels
+    subscriptions_limit      => 10_000,
+    subscriptions_lifetime   => 600,
+    youtube_users_file       => $youtube_users_file,
+    subscribed_channels_file => $subscribed_channels_file,
+
+    history                => 1,
+    history_limit          => 100_000,
+    history_file           => $history_file,
+    recent_history         => 10,
+    remember_session       => 1,
+    remember_session_depth => 10,
+    entry_completion_limit => 10,
+    local_playlist_limit   => -1,
+
+    # Save titles
+    save_titles_to_history  => 0,
+    save_watched_to_history => 0,
+);
+
+{
+    my $config_documentation = <<"EOD";
+#!/usr/bin/perl
+
+# $appname $version - configuration file
+
+EOD
+
+    # Save hash config to file
+    sub dump_configuration {
+        require Data::Dump;
+        open my $config_fh, '>', $config_file
+          or do { warn "[!] Can't open '${config_file}' for write: $!"; return };
+
+        my $dumped_config = q{our $CONFIG = } . Data::Dump::pp(\%CONFIG) . "\n";
+
+        if ($home_dir eq $ENV{HOME}) {
+            $dumped_config =~ s/\Q$home_dir\E/\$ENV{HOME}/g;
+        }
+
+        print $config_fh $config_documentation, $dumped_config;
+        close $config_fh;
+    }
+}
+
+# Creating config unless it exists
+if (not -e $config_file or -z _) {
+    dump_configuration();
+}
+
+local $SIG{TERM} = \&on_mainw_destroy;
+local $SIG{INT}  = \&on_mainw_destroy;
+
+# Locating the .glade interface file and icons dir
+my $glade_file = catfile($share_dir, "gtk-lbry-viewer.glade");
+my $icons_path = catdir($share_dir, 'icons');
+
+# Defining GUI
+my $gui = 'Gtk3::Builder'->new;
+$gui->add_from_file($glade_file);
+$gui->connect_signals(undef);
+
+# GValue wrapper (unused for now)
+sub gval ($$) {
+    Glib::Object::Introspection::GValueWrapper->new('Glib::' . ucfirst($_[0]) => $_[1]);
+}
+
+# Convert a string into an array-ref of bytes
+sub gcarray ($) {
+    [map { ord } split(//, $_[0])]
+}
+
+# -------------  Get GUI objects ------------- #
+
+my %objects = (
+
+    # Windows
+    '__MAIN__'          => \my $mainw,
+    'users_list_window' => \my $users_list_window,
+    'help_window'       => \my $help_window,
+    'prefernces_window' => \my $prefernces_window,
+    'errors_window'     => \my $errors_window,
+    'login_to_youtube'  => \my $login_to_youtube,
+    'details_window'    => \my $details_window,
+    'aboutdialog1'      => \my $about_window,
+    'feeds_window'      => \my $feeds_window,
+    'warnings_window'   => \my $warnings_window,
+
+    # Others
+    'treeview1'              => \my $users_treeview,
+    'feeds_statusbar'        => \my $feeds_statusbar,
+    'treeview2'              => \my $treeview,
+    'treeview3'              => \my $cat_treeview,
+    'feeds_treeview'         => \my $feeds_treeview,
+    'liststore1'             => \my $liststore,
+    'liststore2'             => \my $users_liststore,
+    'liststore4'             => \my $cats_liststore,
+    'liststore11'            => \my $feeds_liststore,
+    'textview3'              => \my $config_view,
+    'warnings_textview'      => \my $warnings_textview,
+    'errors_textview'        => \my $errors_textview,
+    'search_entry'           => \my $search_entry,
+    'statusbar1'             => \my $statusbar,
+    'treeviewcolumn2'        => \my $thumbs_column,
+    'textview2'              => \my $textview_help,
+    'from_author_entry'      => \my $from_author_entry,
+    'more_options_expander'  => \my $more_options_expander,
+    'notebook1'              => \my $notebook,
+    'comboboxtext9'          => \my $resolution_combobox,
+    'comboboxtext8'          => \my $duration_combobox,
+    'comboboxtext3'          => \my $caption_combobox,
+    'comboboxtext4'          => \my $definition_combobox,
+    'comboboxtext5'          => \my $license_combobox,
+    'comboboxtext1'          => \my $published_within_combobox,
+    'comboboxtext13'         => \my $subscriptions_order_combobox,
+    'panel_user_entry'       => \my $panel_user_entry,
+    'comboboxtext6'          => \my $panel_account_type_combobox,
+    'comboboxtext2'          => \my $order_combobox,
+    'comboboxtext7'          => \my $channel_type_combobox,
+    'comboboxtext10'         => \my $search_for_combobox,
+    'spinbutton1'            => \my $spin_results,
+    'spinbutton2'            => \my $spin_start_with_page,
+    'thumbs_checkbutton'     => \my $thumbs_checkbutton,
+    'fullscreen_checkbutton' => \my $fullscreen_checkbutton,
+    'clear_list_checkbutton' => \my $clear_list_checkbutton,
+    'dash_checkbutton'       => \my $dash_checkbutton,
+    'audio_only_checkbutton' => \my $audio_only_checkbutton,
+    'hbox2'                  => \my $hbox2,
+    'feeds_title'            => \my $feeds_title,
+    'channel_name_save'      => \my $save_channel_name_entry,
+    'channel_id_save'        => \my $save_channel_id_entry,
+    'main-menu-history-menu' => \my $history_menu,
+              );
+
+while (my ($key, $value) = each %objects) {
+    my $object = $gui->get_object($key);
+    if (defined $object) {
+        ${$value} = $object;
+    }
+    else {
+        print STDERR "[WARN] undefined object: $key\n";
+    }
+}
+
+# __WARN__ handle
+local $SIG{__WARN__} = sub {
+    my $warning = strip_spaces(join('', @_));
+
+    say STDERR $warning;
+
+    return if $warning =~ / at \(eval /;
+    return if $warning =~ /\bunhandled exception in callback:/;
+    return if $warning =~ /, or \} expected while parsing object\/hash/;
+
+    $warning = "[" . localtime(time) . "]: " . $warning . "\n";
+
+    set_text($warnings_textview, $warning, append => 1);
+};
+
+# __DIE__ handle
+local $SIG{__DIE__} = sub {
+    my $caller = [caller]->[0];
+    my $error  = strip_spaces(join('', @_));
+
+    say STDERR $error;
+
+    # Ignore harmless errors
+    return if $error =~ / at \(eval /;
+    return if $error =~ /, or \} expected while parsing object\/hash/;
+
+    # Ignore third-party errors
+    if (not $caller =~ /^(?:main\z|WWW::LbryViewer\b)/) {
+        return;
+    }
+
+    set_text(
+        $errors_textview,
+        $error . do {
+            if ($error =~ /^Can't locate (.+?)\.pm\b/) {
+                my $module = $1;
+                $module =~ s{[/\\]+}{::}g;
+                return if $module eq 'LWP::UserAgent::Cached';
+                "\nThe module $module is required!\n\nTo install it, just type in terminal:\n\tsudo cpan $module\n";
+            }
+          }
+          . "\n\n=>> Previous warnings:\n" . get_text($warnings_textview)
+    );
+
+    warn "$error\n";
+    $errors_window->show;
+    return 1;
+};
+
+#---------------------- LOAD IMAGES ----------------------#
+my $app_icon_pixbuf       = 'Gtk3::Gdk::Pixbuf'->new_from_file(catfile($icons_path, "gtk-lbry-viewer.png"));
+my $user_icon_pixbuf      = 'Gtk3::Gdk::Pixbuf'->new_from_file_at_size(catfile($icons_path, "user.png"),          16,  16);
+my $feed_icon_pixbuf      = 'Gtk3::Gdk::Pixbuf'->new_from_file_at_size(catfile($icons_path, "feed.png"),          16,  16);
+my $feed_icon_gray_pixbuf = 'Gtk3::Gdk::Pixbuf'->new_from_file_at_size(catfile($icons_path, "feed_gray.png"),     16,  16);
+my $default_thumb         = 'Gtk3::Gdk::Pixbuf'->new_from_file_at_size(catfile($icons_path, "default_thumb.jpg"), 160, 90);
+
+# Setting application title and icon
+$mainw->set_title("$appname $version");
+$mainw->set_icon($app_icon_pixbuf);
+
+our $CONFIG;
+require $config_file;    # Load the configuration file
+
+if (ref $CONFIG ne 'HASH') {
+    die "ERROR: Invalid configuration file!\n\t\$CONFIG is not an HASH ref!";
+}
+
+# Get valid config keys
+my @valid_keys = grep { exists $CONFIG{$_} } keys %{$CONFIG};
+@CONFIG{@valid_keys} = @{$CONFIG}{@valid_keys};
+
+# Define the cache directory
+if (not defined $CONFIG{cache_dir}) {
+
+    my $cache_dir =
+      ($ENV{XDG_CACHE_HOME} and -d -w $ENV{XDG_CACHE_HOME})
+      ? $ENV{XDG_CACHE_HOME}
+      : catdir($home_dir, '.cache');
+
+    if (not -d -w $cache_dir) {
+        $cache_dir = catdir(curdir(), '.cache');
+    }
+
+    $CONFIG{cache_dir} = catdir($cache_dir, 'lbry-viewer');
+}
+
+# Create the cache directory (if needed)
+foreach my $path ($CONFIG{cache_dir}) {
+    next if -d $path;
+    require File::Path;
+    eval { File::Path::make_path($path) }
+      or warn "[!] Can't create path <<$path>>: $!";
+}
+
+{
+    my $split_string = sub {
+        grep { $_ ne '' } split(/\W+/, CORE::fc($_[0]));
+    };
+
+    my %history_dict;
+
+    sub update_history_dict {
+        my (@entries) = @_;
+
+        foreach my $str (@entries) {
+            my $str_ref = \$str;
+
+            # Create models from each word of the string
+            foreach my $word ($split_string->($str)) {
+                my $ref = \%history_dict;
+                foreach my $char (split(//, $word)) {
+                    $ref = $ref->{$char} //= {};
+                    push @{$ref->{values}}, $str_ref;
+                }
+            }
+        }
+    }
+
+    my $completion;
+
+    sub analyze_text {
+        my ($buffer) = @_;
+
+        $completion // return;
+        my $text   = $buffer->get_text;
+        my @tokens = $split_string->($text);
+
+        my (@words, @matches, %analyzed);
+        foreach my $word (@tokens) {
+
+            my $ref = \%history_dict;
+            foreach my $char (split(//, $word)) {
+                if (exists $ref->{$char}) {
+                    $ref = $ref->{$char};
+                }
+                else {
+                    $ref = undef;
+                    last;
+                }
+            }
+
+            if (defined $ref and exists $ref->{values}) {
+                push @words, $word;
+                foreach my $match (@{$ref->{values}}) {
+                    if (not exists $analyzed{$match}) {
+                        undef $analyzed{$match};
+                        unshift @matches, $$match;
+                    }
+                }
+            }
+            else {
+                @matches = ();    # don't include partial matches
+                last;
+            }
+        }
+
+        foreach my $token (@tokens) {
+            @matches = grep { index(CORE::fc($_), $token) != -1 } @matches;
+        }
+
+        my $store = Gtk3::ListStore->new(['Glib::String']);
+
+        my $i = 0;
+        foreach my $str (
+            map  { $_->[0] }
+            sort { $b->[1] <=> $a->[1] }
+            map {
+                my @parts = $split_string->($_);
+
+                my $end_w = $#words;
+                my $end_p = $#parts;
+
+                my $min_end = $end_w < $end_p ? $end_w : $end_p;
+
+                my $order_score = 0;
+                for (my $i = 0 ; $i <= $min_end ; ++$i) {
+                    my $word = $words[$i];
+
+                    for (my $j = $i ; $j <= $end_p ; ++$j) {
+
+                        my $matched;
+                        my $continue = 1;
+
+                        my $part = $parts[$j];
+
+                        while ($part eq $word) {
+                            $order_score += 1 - 1 / (length($word) + 1)**2;
+                            $matched ||= 1;
+                            $part = $parts[++$j] // do { $continue = 0; last };
+                            $word = $words[++$i] // do { $continue = 0; last };
+                        }
+
+                        if ($matched) {
+                            if ($continue and index($part, $word) == 0) {
+                                $order_score += 1 - 1 / (length($word) + 1);
+                            }
+                            last;
+                        }
+                        elsif (index($part, $word) == 0) {
+                            $order_score += length($word) / length($part);
+                            last;
+                        }
+                    }
+                }
+
+                my $prefix_score = 0;
+                foreach my $i (0 .. $min_end) {
+                    (
+                     ($parts[$i] eq $words[$i])
+                     ? do {
+                         $prefix_score += 1;
+                         1;
+                       }
+                     : (index($parts[$i], $words[$i]) == 0) ? do {
+                         $prefix_score += length($words[$i]) / length($parts[$i]);
+                         0;
+                       }
+                     : 0
+                    )
+                      || last;
+                }
+
+                ## printf("score('@parts', '@words') = %.4g + %.4g = %.4g\n",
+                ##        $order_score, $prefix_score, $order_score + $prefix_score);
+
+                [$_, $order_score + $prefix_score]
+            } @matches
+          ) {
+            my $iter = $store->append;
+            $store->set($iter, [0], [$str]);
+            last if ++$i == $CONFIG{entry_completion_limit};
+        }
+
+        $completion->set_model($store);
+    }
+
+    my %history;
+    my $history_fh;
+
+    sub set_history {
+        defined($history_fh) && return 1;
+
+        # Open the history file for appending
+        if (open($history_fh, '>>:utf8', $CONFIG{history_file})) {
+            select((select($history_fh), $| = 1)[0]);    # autoflush
+        }
+        else {
+            warn "[!] Can't open history file `$CONFIG{history_file}' for appending: $!";
+            return;
+        }
+
+        # Slurp the history file into memory
+        my @history;
+        my @search_history;
+
+        if (open(my $fh, '<:utf8', $CONFIG{history_file})) {
+            chomp(@history = <$fh>);
+        }
+
+        foreach my $line (@history) {
+            if (substr($line, 0, 1) eq '~') {
+                $line = substr($line, 1);
+            }
+            else {
+                unshift @search_history, $line;
+            }
+            undef $history{CORE::fc($line)};
+        }
+
+        require List::Util;
+
+        # Workaround for List::Util < 1.45
+        if (!defined(&List::Util::uniq)) {
+            *List::Util::uniq = sub {
+                my %seen;
+                grep { !$seen{$_}++ } @_;
+            };
+        }
+
+        # Keep only the most recent non-duplicated entries
+        @history        = reverse(List::Util::uniq(reverse(@history)));
+        @search_history = List::Util::uniq(@search_history);
+
+        # Set entry completion
+        $completion = Gtk3::EntryCompletion->new;
+        $completion->set_match_func(sub { 1 });
+        $completion->set_text_column(0);
+        $search_entry->set_completion($completion);
+
+        # Create the completion dictionary
+        update_history_dict(@history);
+
+        my $recent_top = $CONFIG{recent_history};
+
+        if ($recent_top > scalar(@search_history)) {
+            $recent_top = scalar(@search_history);
+        }
+
+        my @recent_history = grep { defined($_) } @search_history[0 .. $recent_top - 1];
+
+        if (not @recent_history or $recent_top <= 0) {
+            $gui->get_object('main-menu-history')->set_visible(0);
+        }
+
+        foreach my $text (@recent_history) {
+
+            my $label = $text;
+            if (length($label) > 30) {
+                $label = substr($label, 0, 30) . '...';
+            }
+
+            my $item = 'Gtk3::ImageMenuItem'->new($label);
+            $item->signal_connect(
+                activate => sub {
+                    $search_entry->set_text($text);
+                    $search_entry->set_position(length($text));
+                    search();
+                }
+            );
+            $item->set_property(tooltip_text => "Search for „${text}”");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("system-search", q{menu}));
+            $item->show;
+            $history_menu->append($item);
+        }
+
+        # Keep only the most recent half of the history file when the limit has been reached
+        if ($CONFIG{history_limit} > 0 and $#history >= $CONFIG{history_limit}) {
+
+            # Try to create a backup, first
+            require File::Copy;
+            File::Copy::cp($CONFIG{history_file}, "$CONFIG{history_file}.bak");
+
+            # Now, try to rewrite the history file
+            if (open(my $fh, '>:utf8', $CONFIG{history_file})) {
+
+                # Keep only the most recent half part of the history file
+                say {$fh} join("\n", @history[($CONFIG{history_limit} >> 1) .. $#history]);
+                close $fh;
+            }
+        }
+
+        return 1;
+    }
+
+    sub append_to_history {
+        my ($text, $is_search_keyword) = @_;
+
+        my $str = join(' ', split(' ', $text));
+
+        if ($is_search_keyword or not exists $history{CORE::fc($str)}) {
+            if (set_history()) {
+
+                if ($is_search_keyword) {
+                    say {$history_fh} $str;
+                }
+                else {
+                    say {$history_fh} "~" . $str;
+                }
+            }
+            undef $history{CORE::fc($str)};
+            update_history_dict($str);
+        }
+    }
+}
+
+# Locate yt-dlp or youtube-dl
+if (not defined($CONFIG{ytdl_cmd})) {
+
+    foreach my $ytdl (qw(yt-dlp youtube-dl)) {
+        my $ytdl_path = which_command($ytdl);
+
+        if (defined($ytdl_path)) {
+            $CONFIG{ytdl_cmd} //= $ytdl_path;
+            last;
+        }
+    }
+
+    $CONFIG{ytdl_cmd} //= 'yt-dlp';
+}
+
+# Locate video player
+if (not $CONFIG{video_player_selected}) {
+
+    foreach my $key (sort keys %{$CONFIG{video_players}}) {
+        if (defined(my $abs_player_path = which_command($CONFIG{video_players}{$key}{cmd}))) {
+            $CONFIG{video_players}{$key}{cmd} = $abs_player_path;
+            $CONFIG{video_player_selected} = $key;
+            last;
+        }
+    }
+
+    if (not $CONFIG{video_player_selected}) {
+        warn "\n[!] Please install a supported video player! (e.g.: mpv)\n\n";
+        $CONFIG{video_player_selected} = 'mpv';
+    }
+}
+
+{
+    my $update_config = 0;
+
+    foreach my $key (keys %CONFIG) {
+        if (not exists $CONFIG->{$key}) {
+            $update_config = 1;
+            last;
+        }
+    }
+
+    dump_configuration() if $update_config;
+}
+
+# Locate a terminal
+if (not defined $CONFIG{terminal}) {
+    foreach my $term (
+                      'gnome-terminal', 'lxterminal', 'terminal', 'xfce4-terminal',
+                      'sakura',         'st',         'lilyterm', 'evilvte',
+                      'superterm',      'terminator', 'kterm',    'mlterm',
+                      'mrxvt',          'rxvt',       'urxvt',    'termite',
+                      'termit',         'fbterm',     'stjerm',   'yakuake',
+                      'tilix',          'roxterm',    'xterm',
+      ) {
+        if (defined(my $abs_path = which_command($term))) {
+            $CONFIG{terminal} = $abs_path;
+
+            # Some terminals require changing the default value of `terminal_exec`.
+            # Probably more terminals require this modification. PRs are welcome.
+            if (   $term eq 'st'
+                or $term eq 'lxterminal') {
+                $CONFIG{terminal_exec} = '-e %s';
+            }
+
+            last;
+        }
+    }
+
+    $CONFIG{terminal} //= $ENV{TERM} || 'xterm';
+}
+
+my %ResultsHistory = (
+                      current => -1,
+                      results => [],
+                     );
+
+# Locate CLI lbry-viewer
+$CONFIG{lbry_viewer} //= which_command('lbry-viewer') // 'lbry-viewer';
+
+my $yv_obj = WWW::LbryViewer->new(
+                                  escape_utf8 => 1,
+                                  config_dir  => $config_dir,
+                                  ytdl        => $CONFIG{ytdl},
+                                  ytdl_cmd    => $CONFIG{ytdl_cmd},
+                                  env_proxy   => $CONFIG{env_proxy},
+                                  cache_dir   => $CONFIG{cache_dir},
+                                  cookie_file => $CONFIG{cookie_file},
+                                  user_agent  => $CONFIG{user_agent},
+                                  timeout     => $CONFIG{timeout},
+                                 );
+
+#$yv_obj->load_authentication_tokens();
+
+if (defined $yv_obj->get_access_token()) {
+    show_user_panel();
+}
+else {
+    $statusbar->push(1, 'Not logged in.');
+}
+
+require WWW::LbryViewer::Utils;
+
+my $yv_utils = WWW::LbryViewer::Utils->new(lbry_url_format    => $CONFIG{lbry_video_url},
+                                           thousand_separator => $CONFIG{thousand_separator},);
+
+# Set default combobox values
+$definition_combobox->set_active(0);
+$duration_combobox->set_active(0);
+$caption_combobox->set_active(0);
+$order_combobox->set_active(0);
+
+# Spin button start with page
+$spin_start_with_page->set_value(1);
+
+sub apply_configuration {
+
+    # Fullscreen mode
+    $fullscreen_checkbutton->set_active($CONFIG{fullscreen});
+
+    # Audio-only mode
+    $audio_only_checkbutton->set_active($CONFIG{audio_only});
+
+    # DASH mode
+    $dash_checkbutton->set_active($CONFIG{dash});
+
+    $clear_list_checkbutton->set_active($CONFIG{clear_search_list});
+    $panel_account_type_combobox->set_active($CONFIG{active_panel_account_combobox});
+    $channel_type_combobox->set_active($CONFIG{active_channel_type_combobox});
+    $subscriptions_order_combobox->set_active($CONFIG{active_subscriptions_order_combobox});
+
+    $published_within_combobox->set_active(0);
+
+    foreach my $option_name (
+                             qw(
+                             maxResults videoDimension videoLicense
+                             region debug http_proxy user_agent
+                             timeout cookie_file ytdl ytdl_cmd
+                             api_host prefer_mp4 prefer_av1
+                             comments_order prefer_invidious
+                             force_fallback ytdlp_comments
+                             ytdlp_max_comments ytdlp_max_replies
+                             bypass_age_gate_with_proxy
+                             )
+      ) {
+
+        if (defined $CONFIG{$option_name}) {
+            my $code      = \&{"WWW::LbryViewer::set_$option_name"};
+            my $value     = $CONFIG{$option_name};
+            my $set_value = $yv_obj->$code($value);
+
+            if (not defined($set_value) or $set_value ne $value) {
+                warn "[!] Invalid value <$value> for option <$option_name>.\n";
+            }
+        }
+    }
+
+    # Maximum number of results per page
+    $spin_results->set_value($CONFIG{maxResults});
+
+    # Enable/disable thumbnails
+    $thumbs_checkbutton->set_active($CONFIG{show_thumbs});
+
+    # Set the "More options" expander
+    $more_options_expander->set_expanded($CONFIG{active_more_options_expander});
+
+    my %resolution = (
+                      'best' => 0,
+                      '2160' => 1,
+                      '1440' => 2,
+                      '1080' => 3,
+                      '720'  => 4,
+                      '480'  => 5,
+                      '360'  => 6,
+                      '240'  => 7,
+                     );
+
+    my $name = ($CONFIG{resolution} =~ /^(\d+)/) ? $1 : $CONFIG{resolution};
+
+    if (exists $resolution{$name}) {
+        $resolution_combobox->set_active($resolution{$name});
+    }
+    else {
+        $resolution_combobox->set_active($CONFIG{active_resolution_combobox});
+    }
+
+    # Resize the main window
+    $mainw->set_default_size(split(/x/i, $CONFIG{mainw_size}, 2));
+
+    # Center the main window
+    if ($CONFIG{mainw_centered}) {
+        $mainw->set_position("center");
+    }
+
+    $mainw->reshow_with_initial_size;
+
+    if ($CONFIG{mainw_maximized}) {
+        $mainw->maximize();
+    }
+
+    if ($CONFIG{mainw_fullscreen}) {
+        maximize_unmaximize_mainw();
+    }
+
+    # Support for history input
+    if ($CONFIG{history}) {
+        set_history();
+    }
+
+    # HPaned position correction
+    if ($CONFIG{hpaned_position} >= ($mainw->get_size)[0] - 200) {
+        $CONFIG{hpaned_position} = ($mainw->get_size)[0] - $CONFIG{hpaned_width};
+    }
+
+    # Set HPaned position
+    $hbox2->set_position($CONFIG{hpaned_position});
+
+    # Select text from text entry
+    $search_entry->select_region(0, -1);
+}
+
+# Apply the configuration file
+apply_configuration();
+
+# LBRY usernames
+set_usernames();
+
+sub donate {
+    open_external_url('https://www.paypal.com/cgi-bin/webscr?cmd=_s-xclick&hosted_button_id=75FUVBE6Q73T8');
+}
+
+# Set text to a 'textview' object
+sub set_text {
+    my ($object, $text, %args) = @_;
+    my $object_buffer = $object->get_buffer;
+
+    require Encode;
+
+    if (!Encode::is_utf8($text)) {
+        $text = Encode::decode_utf8($text);
+    }
+
+    if ($args{append}) {
+        my $iter = $object_buffer->get_end_iter;
+        $object_buffer->insert($iter, $text);
+    }
+    else {
+        $object_buffer->set_text($text);
+    }
+    $object->set_buffer($object_buffer);
+    return 1;
+}
+
+# Get text from a 'textview' object
+sub get_text {
+    my ($object)      = @_;
+    my $object_buffer = $object->get_buffer;
+    my $start_iter    = $object_buffer->get_start_iter;
+    my $end_iter      = $object_buffer->get_end_iter;
+    $object_buffer->get_text($start_iter, $end_iter, undef);
+}
+
+sub new_image_from_pixbuf {
+    my ($object_name, $pixbuf) = @_;
+    my $object = $gui->get_object($object_name) // return;
+    scalar($object->new_from_pixbuf($pixbuf));
+}
+
+# Setting application icons
+{
+    $gui->get_object('username_list')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $user_icon_pixbuf));
+    $gui->get_object('uploads_button')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $user_icon_pixbuf));
+    $gui->get_object('button6')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $feed_icon_pixbuf));
+}
+
+# Treeview signals
+{
+    $treeview->signal_connect('button_press_event', \&menu_popup);
+    $treeview->signal_connect('size-allocate',      \&treeview_scroll_to_end) if $CONFIG{autoscroll_to_end};
+    $users_treeview->signal_connect('button_press_event', \&users_menu_popup);
+}
+
+# Scroll treeview to end
+sub treeview_scroll_to_end {
+    my ($widget) = @_;
+    my $adj = $widget->get_vadjustment;
+    $adj->set_value($adj->get_upper - $adj->get_page_size);
+}
+
+# Menu popup
+sub menu_popup {
+    my ($treeview, $event) = @_;
+
+    ##my ($path, $col, $cell_x, $cell_y) = ...;
+    my $path = ($treeview->get_path_at_pos($event->x, $event->y))[0] // return 0;
+
+    my $selection = $treeview->get_selection;
+    $selection->select_path($path);
+
+    my $iter = $selection->get_selected() // return 0;
+    my $type = $liststore->get($iter, 7);
+
+    # Play videos with a single-click
+    if ($CONFIG{single_click_play} and $event->button == 1) {
+        get_code();
+        return 0;
+    }
+
+    # Ignore non-right-clicks
+    elsif ($event->button != 3) {
+        return 0;
+    }
+
+    # Ignore the right-click on 'next-page' entry
+    $type eq 'next_page' and return 0;
+
+    # Create the main right-click menu
+    my $menu = 'Gtk3::Menu'->new;
+
+    # More details
+    {
+        my $item = 'Gtk3::ImageMenuItem'->new("Show more details");
+        $item->set_image('Gtk3::Image'->new_from_icon_name("window-new", q{menu}));
+        $item->signal_connect(activate => \&show_details_window);
+        $item->show;
+        $menu->append($item);
+    }
+
+    # Video menu
+    if ($type eq 'video') {
+
+        my $video_id   = $liststore->get($iter, 3);
+        my $video_data = $yv_obj->parse_json_string($liststore->get($iter, 8));
+
+        # Youtube comments
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("LBRY comments");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("edit-copy", q{menu}));
+            $item->signal_connect(activate => \&show_comments_window);
+            $item->show;
+            $menu->append($item);
+        }
+
+        # Separator
+        {
+            my $item = 'Gtk3::SeparatorMenuItem'->new;
+            $item->show;
+            $menu->append($item);
+        }
+
+        # Video submenu
+        {
+            my $video = 'Gtk3::Menu'->new;
+            my $cat   = 'Gtk3::ImageMenuItem'->new("Video");
+            $cat->set_image('Gtk3::Image'->new_from_icon_name("video-x-generic", q{menu}));
+            $cat->show;
+
+            # Play
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Play");
+                $item->signal_connect(activate => \&get_code);
+                $item->set_property(tooltip_text => "Play the video");
+                $item->set_image('Gtk3::Image'->new_from_icon_name("media-playback-start-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Enqueue
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Enqueue");
+                $item->signal_connect(activate => sub { enqueue_video() });
+                $item->set_property(tooltip_text => "Enqueue video to play it later");
+                $item->set_image('Gtk3::Image'->new_from_icon_name("list-add-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Favorite
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Favorite");
+                $item->set_property(tooltip_text => "Save the video in the playlist of favorite videos");
+                $item->signal_connect(
+                    activate => sub {
+                        say(":: Favorite video: ", $yv_utils->get_title($video_data)) if $yv_obj->get_debug;
+                        prepend_video_data_to_file($video_data, $favorite_videos_data_file);
+                    }
+                );
+                $item->set_image('Gtk3::Image'->new_from_icon_name("starred-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Download
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Download");
+                $item->set_property(tooltip_text => "Download the video");
+                $item->signal_connect(activate => \&download_video);
+                $item->set_image('Gtk3::Image'->new_from_icon_name("document-save-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Separator
+            {
+                my $item = 'Gtk3::SeparatorMenuItem'->new;
+                $item->show;
+                $video->append($item);
+            }
+
+            # Like
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Like");
+                $item->set_property(tooltip_text => "Save video in the playlist of liked videos");
+                $item->signal_connect(
+                    activate => sub {
+                        say(":: Liking video: ", $yv_utils->get_title($video_data)) if $yv_obj->get_debug;
+                        prepend_video_data_to_file($video_data, $liked_videos_data_file);
+                    }
+                );
+                $item->set_image('Gtk3::Image'->new_from_icon_name("go-up-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Disike
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Dislike");
+                $item->set_property(tooltip_text => "Save video in the playlist of disliked videos");
+                $item->signal_connect(
+                    activate => sub {
+                        say(":: Disliking video: ", $yv_utils->get_title($video_data)) if $yv_obj->get_debug;
+                        prepend_video_data_to_file($video_data, $disliked_videos_data_file);
+                    }
+                );
+                $item->set_image('Gtk3::Image'->new_from_icon_name("go-down-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Separator
+            {
+                my $item = 'Gtk3::SeparatorMenuItem'->new;
+                $item->show;
+                $video->append($item);
+            }
+
+            # Related videos
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("Related videos");
+                $item->set_property(tooltip_text => "Display videos that are related to this video");
+                $item->signal_connect(activate => \&show_related_videos);
+                $item->set_image('Gtk3::Image'->new_from_icon_name("video-x-generic-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            # Open the LBRY video page
+            {
+                my $item = 'Gtk3::ImageMenuItem'->new("LBRY page");
+                $item->signal_connect(activate => sub { open_external_url(make_youtube_url('video', $video_id)) });
+                $item->set_property(tooltip_text => "Open the LBRY page of this video");
+                $item->set_image('Gtk3::Image'->new_from_icon_name("applications-internet-symbolic", q{menu}));
+                $item->show;
+                $video->append($item);
+            }
+
+            $cat->set_submenu($video);
+            $menu->append($cat);
+        }
+    }
+    elsif ($type eq 'playlist') {
+
+        my $playlist_id = $liststore->get($iter, 3);
+
+        # Playlist videos
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Videos");
+            $item->set_property(tooltip_text => "Display the videos from this playlist");
+            $item->signal_connect(activate => sub { list_playlist($playlist_id) });
+            $item->set_image('Gtk3::Image'->new_from_icon_name("folder-open", q{menu}));
+            $item->show;
+            $menu->append($item);
+        }
+
+        # Separator
+        {
+            my $item = 'Gtk3::SeparatorMenuItem'->new;
+            $item->show;
+            $menu->append($item);
+        }
+    }
+
+    my $channel_id = $liststore->get($iter, 6);
+
+    # Author submenu
+    {
+        my $author = 'Gtk3::Menu'->new;
+        my $cat    = 'Gtk3::ImageMenuItem'->new("Author");
+        $cat->set_image('Gtk3::Image'->new_from_pixbuf($user_icon_pixbuf));
+        $cat->show;
+
+        # Recent uploads from this author
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Uploads");
+            $item->signal_connect(activate => sub { uploads('channel', $channel_id) });
+            $item->set_property(tooltip_text => "Show the most recent videos from this author");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("emblem-shared-symbolic", q{menu}));
+            $item->show;
+            $author->append($item);
+        }
+
+        # Most popular uploads from this author
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Popular");
+            $item->signal_connect(activate => sub { popular_uploads('channel', $channel_id) });
+            $item->set_property(tooltip_text => "Show the most popular videos from this author");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("emblem-videos-symbolic", q{menu}));
+            $item->show;
+            $author->append($item);
+        }
+
+        # Playlists created by this author
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Playlists");
+            $item->signal_connect(activate => \&show_playlists_from_selected_author);
+            $item->set_property(tooltip_text => "Show playlists created by this author");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("emblem-documents-symbolic", q{menu}));
+            $item->show;
+            $author->append($item);
+        }
+
+        # Favorites of this author
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Favorites");
+            $item->signal_connect(activate => sub { favorites('channel', $channel_id) });
+            $item->set_property(tooltip_text => "Show favorite videos of this author");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("emblem-favorite-symbolic", q{menu}));
+            $item->show;
+            $author->append($item);
+        }
+
+        # Recent channel activity events
+#<<<
+        #~ {
+            #~ my $item = 'Gtk3::ImageMenuItem'->new("Activities");
+            #~ $item->signal_connect(activate => sub { activities('channel', $channel_id) });
+            #~ $item->set_property(tooltip_text => "Show recent channel activity events");
+            #~ $item->set_image('Gtk3::Image'->new_from_icon_name("view-refresh-symbolic", q{menu}));
+            #~ $item->show;
+            #~ $author->append($item);
+        #~ }
+#>>>
+
+        # Liked videos by this author
+#<<<
+        #~ {
+            #~ my $item = 'Gtk3::ImageMenuItem'->new("Likes");
+            #~ $item->signal_connect(activate => sub { likes('channel', $channel_id) });
+            #~ $item->set_property(tooltip_text => "Show liked videos by this author");
+            #~ $item->set_image('Gtk3::Image'->new_from_icon_name("emblem-default-symbolic", q{menu}));
+            #~ $item->show;
+            #~ $author->append($item);
+        #~ }
+#>>>
+
+        # Separator
+        {
+            my $item = 'Gtk3::SeparatorMenuItem'->new;
+            $item->show;
+            $author->append($item);
+        }
+
+        my $channel_data = $yv_obj->parse_json_string($liststore->get($iter, 8));
+        my $channel_name = $yv_utils->get_channel_title($channel_data);
+
+        # Subscribe to channel
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Subscribe");
+            $item->signal_connect(activate => sub { save_channel_by_id($channel_id, $channel_name, subscribe => 1) });
+            $item->set_property(tooltip_text => "Subscribe to this channel");
+            $item->set_image('Gtk3::Image'->new_from_pixbuf($feed_icon_gray_pixbuf));
+            $item->show;
+            $author->append($item);
+        }
+
+        # Save channel in the user-list
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Save channel");
+            $item->set_property(tooltip_text => "Save the channel in the user-list");
+            $item->signal_connect(activate => sub { save_channel_by_id($channel_id, $channel_name) });
+            $item->set_image('Gtk3::Image'->new_from_icon_name("star-new-symbolic", q{menu}));
+            $item->show;
+            $author->append($item);
+        }
+
+        # Open the LBRY channel page
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("LBRY page");
+            $item->signal_connect(activate => sub { open_external_url(make_youtube_url('channel', $channel_id)) });
+            $item->set_property(tooltip_text => "Open the LBRY page of this channel");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("applications-internet-symbolic", q{menu}));
+            $item->show;
+            $author->append($item);
+        }
+
+        if ($type eq 'video' or $type eq 'playlist') {
+            $cat->set_submenu($author);
+            $menu->append($cat);
+        }
+        else {
+            $menu = $author;
+        }
+    }
+
+    if (@VIDEO_QUEUE) {
+
+        # Separator
+        {
+            my $item = 'Gtk3::SeparatorMenuItem'->new;
+            $item->show;
+            $menu->append($item);
+        }
+
+        # Play enqueued videos
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Play enqueued videos");
+            $item->signal_connect(activate => \&play_enqueued_videos);
+            $item->set_property(tooltip_text => "Play the enqueued videos (if any)");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("media-playback-start", q{menu}));
+            $item->show;
+            $menu->append($item);
+        }
+    }
+
+    if ($type eq 'video' or $type eq 'playlist') {
+
+        # Separator
+        {
+            my $item = 'Gtk3::SeparatorMenuItem'->new;
+            $item->show;
+            $menu->append($item);
+        }
+
+        # Play as audio
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Play as audio");
+            $item->signal_connect(
+                activate => sub {
+                    my ($id, $iter) = get_selected_entry_code();
+                    my $type = $liststore->get($iter, 7);
+                    if (defined($id) and $type eq 'video') {
+                        execute_cli_lbry_viewer("--id=$id --no-video");
+                    }
+                    elsif (defined($id) and $type eq 'playlist') {
+                        execute_cli_lbry_viewer("--pp=$id --no-video");
+                    }
+                }
+            );
+            $item->set_property(tooltip_text => "Play as audio in a new terminal");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("audio-headphones", q{menu}));
+            $item->show;
+            $menu->append($item);
+        }
+
+        # Play with CLI lbry-viewer
+        {
+            my $item = 'Gtk3::ImageMenuItem'->new("Play in terminal");
+            $item->signal_connect(activate => \&play_selected_video_with_cli_lbry_viewer);
+            $item->set_property(tooltip_text => "Play with lbry-viewer in a new terminal");
+            $item->set_image('Gtk3::Image'->new_from_icon_name("computer", q{menu}));
+            $item->show;
+            $menu->append($item);
+        }
+    }
+
+    $menu->popup(undef, undef, undef, undef, $event->button, $event->time);
+    return 0;
+}
+
+sub users_menu_popup {
+    my ($treeview, $event) = @_;
+
+    if ($event->button != 3) {
+        return 0;
+    }
+
+    # Hardcoded menu
+    #my $menu = $gui->get_object('user_option_menu');
+
+    # Dynamic menu
+    my $path = ($treeview->get_path_at_pos($event->x, $event->y))[0] // return 0;
+
+    my $selection = $treeview->get_selection;
+    $selection->select_path($path);
+
+    my $iter = $selection->get_selected() // return 0;
+
+    my $channel_id   = $users_liststore->get($iter, 0);
+    my $channel_name = $users_liststore->get($iter, 1);
+
+    # Create the main right-click menu
+    my $menu = 'Gtk3::Menu'->new;
+
+    # Videos from channel
+    {
+        my $item = 'Gtk3::ImageMenuItem'->new("Videos");
+        $item->set_image('Gtk3::Image'->new_from_icon_name("applications-multimedia", q{menu}));
+        $item->set_property(tooltip_text => "List the latest videos from this channel");
+        $item->signal_connect(activate => \&videos_from_selected_username);
+        $item->show;
+        $menu->append($item);
+    }
+
+    # Playlists from channel
+    {
+        my $item = 'Gtk3::ImageMenuItem'->new("Playlists");
+        $item->set_image('Gtk3::Image'->new_from_icon_name("emblem-documents", q{menu}));
+        $item->set_property(tooltip_text => "List the playlists created by this channel");
+        $item->signal_connect(activate => \&playlists_from_selected_username);
+        $item->show;
+        $menu->append($item);
+    }
+
+    # Subscribe / unsubscribe from channel
+    {
+        my $item = 'Gtk3::ImageMenuItem'->new($subscribed_channels{$channel_id} ? "Unsubscribe" : "Subscribe");
+        $subscribed_channels{$channel_id}
+          ? $item->set_image('Gtk3::Image'->new_from_pixbuf($feed_icon_gray_pixbuf))
+          : $item->set_image('Gtk3::Image'->new_from_pixbuf($feed_icon_pixbuf));
+        $item->signal_connect(activate => \&subscribe_toggle_selected_username);
+        $item->show;
+        $menu->append($item);
+    }
+
+    # Remove the channel
+    {
+        my $item = 'Gtk3::ImageMenuItem'->new("Remove");
+        $item->set_image('Gtk3::Image'->new_from_icon_name("gtk-remove", q{menu}));
+        $item->set_property(tooltip_text => "Remove the channel from this list");
+        $item->signal_connect(activate => \&remove_selected_username);
+        $item->show;
+        $menu->append($item);
+    }
+
+    $menu->popup(undef, undef, undef, undef, $event->button, $event->time);
+    return 0;
+}
+
+# Setting help text
+set_text(
+    $textview_help, <<"HELP_TEXT"
+
+# Key binds
+
+    CTRL+H : help window
+    CTRL+L : login window
+    CTRL+P : preferences window
+    CTRL+Y : start CLI Lbry Viewer
+    CTRL+E : enqueue the selected video
+
+    CTRL+U : show the saved user-list
+    CTRL+D : show more details for a selected entry
+    CTRL+W : show the warnings window
+    CTRL+G : show favorite videos of the author of a selected video
+    CTRL+R : show related videos for a selected video
+    CTRL+M : show videos from the author of a selected video
+    CTRL+K : show playlists from the author of a selected video
+    CTRL+S : add the author of a selected video to the user-list
+    CTRL+Q : close the application
+
+    DEL    : remove the selected entry from the list
+    F11    : minimize-maximize the main window
+
+HELP_TEXT
+);
+
+{
+    my $font = Pango::FontDescription::from_string('Monospace 8');
+    $textview_help->modify_font($font);
+}
+
+# ------------------- Accels ------------------- #
+
+# Main window
+my $accel = Gtk3::AccelGroup->new;
+$accel->connect(ord('h'), ['control-mask'], ['visible'], \&show_help_window);
+$accel->connect(ord('e'), ['control-mask'], ['visible'], \&enqueue_video);
+$accel->connect(ord('l'), ['control-mask'], ['visible'], \&show_login_to_youtube_window);
+$accel->connect(ord('p'), ['control-mask'], ['visible'], \&show_preferences_window);
+$accel->connect(ord('q'), ['control-mask'], ['visible'], \&on_mainw_destroy);
+$accel->connect(ord('u'), ['control-mask'], ['visible'], \&show_users_list_window);
+$accel->connect(ord('y'), ['control-mask'], ['visible'], \&run_cli_lbry_viewer);
+$accel->connect(ord('d'), ['control-mask'], ['visible'], \&show_details_window);
+
+#$accel->connect(ord('c'), ['control-mask'], ['visible'], \&show_comments_window);
+$accel->connect(ord('s'), ['control-mask'], ['visible'], \&add_user_to_favorites);
+$accel->connect(ord('r'), ['control-mask'], ['visible'], \&show_related_videos);
+$accel->connect(ord('g'), ['control-mask'], ['visible'], \&show_user_favorite_videos);
+$accel->connect(ord('m'), ['control-mask'], ['visible'], \&show_videos_from_selected_author);
+$accel->connect(ord('k'), ['control-mask'], ['visible'], \&show_playlists_from_selected_author);
+$accel->connect(ord('w'), ['control-mask'], ['visible'], \&show_warnings_window);
+$accel->connect(0xffff,   ['lock-mask'],    ['visible'], \&delete_selected_row);
+$accel->connect(0xffc8,   ['lock-mask'],    ['visible'], \&maximize_unmaximize_mainw);
+$mainw->add_accel_group($accel);
+
+# Support for navigating back and forth using the side buttons of the mouse
+$mainw->signal_connect(
+    'button-release-event' => sub {
+        my (undef, $event) = @_;
+
+        my $button = $event->button;
+
+        if ($button == 8) {
+            display_previous_results();
+        }
+        elsif ($button == 9) {
+            display_next_results();
+        }
+    }
+);
+
+# Other windows (ESC key to close them)
+$accel = Gtk3::AccelGroup->new;
+$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_users_list_window);
+$users_list_window->add_accel_group($accel);
+
+$accel = Gtk3::AccelGroup->new;
+$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_feeds_window);
+$feeds_window->add_accel_group($accel);
+
+$accel = Gtk3::AccelGroup->new;
+$accel->connect(0xff1b,   ['lock-mask'],    ['visible'], \&hide_preferences_window);
+$accel->connect(ord('s'), ['control-mask'], ['visible'], \&save_configuration);
+$prefernces_window->add_accel_group($accel);
+
+$accel = Gtk3::AccelGroup->new;
+$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_help_window);
+$help_window->add_accel_group($accel);
+
+$accel = Gtk3::AccelGroup->new;
+$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_details_window);
+$details_window->add_accel_group($accel);
+
+# ------------------ Authentication ------------------ #
+
+sub show_user_panel {
+    change_subscription_page(1);
+    $statusbar->push(1, "Logged in.");
+    return 1;
+}
+
+# ------------------ Showing/Hidding windows ------------------ #
+
+# Main window
+sub maximize_unmaximize_mainw {
+    state $maximized = 0;
+    $maximized++ % 2
+      ? $mainw->unfullscreen
+      : $mainw->fullscreen;
+}
+
+# Users list window
+sub show_users_list_window {
+    $users_list_window->show;
+    return 1;
+}
+
+sub hide_users_list_window {
+    $users_list_window->hide;
+    return 1;
+}
+
+# Help window
+sub show_help_window {
+    $help_window->show;
+    return 1;
+}
+
+sub hide_help_window {
+    $help_window->hide;
+    return 1;
+}
+
+# Warnings window
+
+sub show_warnings_window {
+    $warnings_window->show;
+    return 1;
+}
+
+sub hide_warnings_window {
+    $warnings_window->hide;
+    return 1;
+}
+
+# About Window
+sub show_about_window {
+    $about_window->set_program_name("$appname $version");
+    $about_window->set_logo($app_icon_pixbuf);
+    $about_window->set_resizable(1);
+    $about_window->show;
+    return 1;
+}
+
+sub hide_about_window {
+    $about_window->hide;
+    return 1;
+}
+
+# Error window
+sub hide_errors_window {
+    $errors_window->hide;
+    return 1;
+}
+
+# Login window
+sub show_login_to_youtube_window {
+    $login_to_youtube->show;
+    return 1;
+}
+
+sub hide_login_to_youtube_window {
+    $login_to_youtube->hide;
+    return 1;
+}
+
+# Details window
+sub show_details_window {
+    my ($code, $iter) = get_selected_entry_code();
+    $code // return;
+
+    my $type = $liststore->get($iter, 7);
+
+    if ($type eq 'next_page') {
+        return 1;
+    }
+
+    $details_window->show;
+    Glib::Idle->add(sub { set_entry_details($code, $iter); return 0 }, [], Glib::G_PRIORITY_LOW);
+    return 1;
+}
+
+sub hide_details_window {
+    $details_window->hide;
+    return 1;
+}
+
+sub set_comments {
+    my $videoID = get_selected_entry_code(type => 'video') // return;
+    $feeds_liststore->clear;
+    display_comments($yv_obj->comments_from_video_id($videoID));
+}
+
+# Comments window
+sub show_comments_window {
+    my ($videoID, $iter) = get_selected_entry_code(type => 'video');
+    $videoID // return;
+
+    my $info = $liststore->get($iter, 0);
+    my ($video_title) = $info =~ m{^.*?(<big><b>.*?</b></big>)}s;
+
+    $feeds_title->set_markup("<big>$video_title</big>");
+    $feeds_title->set_tooltip_markup("$video_title");
+
+    $feeds_window->show;
+    $feeds_statusbar->pop(0);
+
+    Glib::Idle->add(
+        sub {
+            display_comments($yv_obj->comments_from_video_id($videoID));
+            return 0;
+        },
+        [],
+        Glib::G_PRIORITY_LOW
+    );
+
+    return 1;
+}
+
+sub hide_feeds_window {
+    $feeds_liststore->clear;
+    $feeds_window->hide;
+    return 1;
+}
+
+# Preferences window
+sub show_preferences_window {
+    require Data::Dump;
+    get_main_window_size();
+    my $config_view_buffer = $config_view->get_buffer;
+    $config_view_buffer->set_text(Data::Dump::dump({map { ($_, $CONFIG{$_}) } grep { not /^active_/ } keys %CONFIG}));
+    $config_view->set_buffer($config_view_buffer);
+    state $font = Pango::FontDescription::from_string('Monospace 8');
+    $config_view->modify_font($font);
+    $prefernces_window->show;
+    return 1;
+}
+
+sub hide_preferences_window {
+    $prefernces_window->hide;
+    return 1;
+}
+
+# Save plaintext config to file
+sub save_configuration {
+    my $config = get_text($config_view);
+
+    my $hash_ref = eval $config;
+
+    print STDERR $@ if $@;
+    die $@          if $@;
+
+    %CONFIG = (%CONFIG, %{$hash_ref});
+    dump_configuration();
+
+    apply_configuration();
+    hide_preferences_window();
+    return 1;
+}
+
+sub delete_selected_row {
+    my (undef, $iter) = get_selected_entry_code();
+    $iter // return;
+    $liststore->remove($iter);
+    return 1;
+}
+
+# Combo boxes changes
+sub combobox_order_changed {
+    $yv_obj->set_order($order_combobox->get_active_text);
+}
+
+sub combobox_resolution_changed {
+    $CONFIG{active_resolution_combobox} = $resolution_combobox->get_active;
+    my $res = $resolution_combobox->get_active_text;
+    $CONFIG{resolution} = $res =~ /^(\d+)p\z/ ? $1 : $res;
+}
+
+sub combobox_duration_changed {
+    my $text = $duration_combobox->get_active_text;
+    $yv_obj->set_videoDuration($text);
+}
+
+sub combobox_caption_changed {
+    my $text = $caption_combobox->get_active_text;
+    $yv_obj->set_videoCaption($text);
+}
+
+sub combobox_subscriptions_order_changed {
+    $CONFIG{active_subscriptions_order_combobox} = $subscriptions_order_combobox->get_active;
+    $yv_obj->set_subscriptions_order($subscriptions_order_combobox->get_active_text);
+}
+
+sub combobox_panel_account_changed {
+    my $text = $panel_account_type_combobox->get_active_text;
+    $CONFIG{active_panel_account_combobox} = $panel_account_type_combobox->get_active;
+    if ($text =~ /^(mine|myself)/i) {
+        $panel_user_entry->hide;
+    }
+    else {
+        $panel_user_entry->show;
+    }
+}
+
+sub combobox_channel_type_changed {
+    $CONFIG{active_channel_type_combobox} = $channel_type_combobox->get_active;
+}
+
+sub combobox_definition_changed {
+    my $text = $definition_combobox->get_active_text;
+    $yv_obj->set_videoDefinition($text);
+}
+
+sub combobox_license_changed {
+    my $text = $license_combobox->get_active_text;
+    $yv_obj->set_videoLicense($text);
+}
+
+sub combobox_published_within_changed {
+
+    my $period = $published_within_combobox->get_active_text;
+
+    if ($period =~ /^any/) {
+        $yv_obj->set_date(undef);
+    }
+    else {
+        $yv_obj->set_date($period);
+    }
+}
+
+# Spin buttons changes
+sub spin_results_per_page_changed {
+    $yv_obj->set_maxResults($CONFIG{maxResults} = $spin_results->get_value);
+}
+
+# Page number
+sub spin_start_with_page_changed {
+    $yv_obj->set_page($spin_start_with_page->get_value);
+}
+
+# Clear search list
+sub toggled_clear_search_list {
+    $CONFIG{clear_search_list} = $clear_list_checkbutton->get_active() || 0;
+}
+
+# Fullscreen mode
+sub toggled_fullscreen {
+    $CONFIG{fullscreen} = $fullscreen_checkbutton->get_active() || 0;
+}
+
+# Audio-only mode
+sub toggled_audio_only {
+    $CONFIG{audio_only} = $audio_only_checkbutton->get_active() || 0;
+}
+
+# DASH mode
+sub toggled_dash_support {
+    $CONFIG{dash} = $dash_checkbutton->get_active() || 0;
+}
+
+# Check buttons toggles
+sub thumbs_checkbutton_toggled {
+    $CONFIG{show_thumbs} = ($_[0]->get_active() || 0);
+    $thumbs_column->set_visible($CONFIG{show_thumbs});
+}
+
+# "More options" expander
+sub activate_more_options_expander {
+    $CONFIG{active_more_options_expander} = $_[0]->get_expanded() ? 0 : 1;
+}
+
+# Get main window size
+sub get_main_window_size {
+    $CONFIG{mainw_size} = join('x', $mainw->get_size);
+}
+
+sub main_window_state_events {
+    my (undef, $state) = @_;
+
+    my $windowstate = $state->new_window_state();
+    my @states      = split(' ', $windowstate);
+
+    $CONFIG{mainw_maximized}  = (grep { $_ eq 'maximized' } @states)  ? 1 : 0;
+    $CONFIG{mainw_fullscreen} = (grep { $_ eq 'fullscreen' } @states) ? 1 : 0;
+
+    return 1;
+}
+
+sub add_category_header {
+    my ($text) = @_;
+    my $iter = $cats_liststore->append;
+    $cats_liststore->set($iter, [0], ["<big><b>\t$text</b></big>"]);
+    return 1;
+}
+
+sub append_categories {
+    my ($categories, $type) = @_;
+
+    foreach my $category (@$categories) {
+
+        my $label = $category->{title};
+        my $id    = $category->{id};
+
+        $label =~ s{&}{&amp;}g;
+
+        my $iter = $cats_liststore->append;
+
+        $cats_liststore->set(
+                             $iter,
+                             0 => $label,
+                             1 => $id,
+                             2 => $feed_icon_pixbuf,
+                             3 => $type,
+                            );
+    }
+    return 1;
+}
+
+append_categories($yv_obj->video_categories, 'cat');
+
+my $tops_liststore = $gui->get_object('liststore6');
+my $tops_treeview  = $gui->get_object('treeview4');
+
+sub add_top_row {
+    my ($top_name, $top_type) = @_;
+
+    (my $top_label = ucfirst $top_name) =~ tr/_/ /;
+    my $iter = $tops_liststore->append;
+
+    $tops_liststore->set(
+                         $iter,
+                         0 => $top_label,
+                         1 => $feed_icon_pixbuf,
+                         2 => $top_name,
+                         3 => $top_type,
+                        );
+}
+
+my $playlists_liststore = $gui->get_object('liststore6');
+my $playlists_treeview  = $gui->get_object('treeview4');
+
+sub add_local_playlist_row {
+    my ($playlist_name, $playlist_file) = @_;
+
+    my $iter = $playlists_liststore->append;
+
+    $playlists_liststore->set(
+                              $iter,
+                              0 => encode_entities($playlist_name),
+                              1 => $feed_icon_gray_pixbuf,
+                              2 => $playlist_name,
+                              3 => $playlist_file,
+                             );
+}
+
+sub set_local_playlists {
+    my ($top_time, $main_label) = @_;
+
+    my @playlist_files = reverse $yv_utils->get_local_playlist_filenames($local_playlists_dir);
+
+    foreach my $file (@playlist_files) {
+        my $snippet = $yv_utils->local_playlist_snippet($file);
+        add_local_playlist_row($yv_utils->get_title($snippet), $file);
+    }
+}
+
+set_local_playlists();
+
+# ------------ Usernames list window ------------ #
+sub set_usernames {
+    if (-e $CONFIG{youtube_users_file}) {
+        %channels = ((map { @$_ } $yv_utils->read_channels_from_file($CONFIG{youtube_users_file})), %channels);
+    }
+    else {
+        # Default channels
+        %channels = (
+                     '@ComputingForever:9'   => 'Computing Forever',
+                     '@veritasium:f'         => 'Veritasium',
+                     '@3Blue1Brown:b'        => '3Blue1Brown',
+                     '@DistroTube:2'         => 'DistroTube',
+                     '@AlphaNerd:8'          => 'Mental Outlaw',
+                     '@TheLinuxExperiment:e' => 'The Linux Experiment',
+                     '@techlore:3'           => 'Techlore',
+                     '@RobBraxmanTech:6'     => 'Rob Braxman Tech',
+                    );
+    }
+
+    if (-e $CONFIG{subscribed_channels_file}) {
+        %subscribed_channels =
+          ((map { @$_ } $yv_utils->read_channels_from_file($CONFIG{subscribed_channels_file})), %subscribed_channels,);
+    }
+
+    $users_liststore->clear;    # clear the list
+
+    foreach my $channel (sort { CORE::fc($channels{$a} // $a) cmp CORE::fc($channels{$b} // $b) } keys %channels) {
+        my $iter = $users_liststore->append;
+
+        $channels{$channel} // next;
+
+        $users_liststore->set(
+                              $iter,
+                              0 => $channel,
+                              1 => $channels{$channel},
+                              2 => 'channel',
+                              3 => (
+                                    exists($subscribed_channels{$channel})
+                                    ? $feed_icon_pixbuf
+                                    : $user_icon_pixbuf
+                                   ),
+                             );
+    }
+}
+
+sub save_channel {
+    my $channel_name = $save_channel_name_entry->get_text;
+    my $channel_id   = $save_channel_id_entry->get_text;
+
+    # Validate the channel id
+    if (defined($channel_id) and $channel_id =~ /$valid_channel_id_re/) {
+
+        $channel_id = $+{channel_id};
+
+        # Get the channel name when empty
+        if (not defined($channel_name) or not $channel_name =~ /\S/) {
+            $channel_name = $yv_obj->channel_title_from_id($channel_id) // die "Invalid channel ID: <<$channel_id>>";
+        }
+    }
+    elsif (defined($channel_name) and $channel_name =~ /$valid_channel_id_re/) {
+
+        $channel_name = $+{channel_id};
+        $channel_id   = $yv_obj->channel_id_from_username($channel_name);
+
+        if (not defined $channel_id) {
+            die "Can't get channel ID from username: <<$channel_name>>";
+        }
+    }
+    elsif (defined($channel_id) and $channel_id =~ /\S/) {
+        die "Invalid channel ID: <<$channel_id>>";
+    }
+    else {
+        return;
+    }
+
+    save_channel_by_id($channel_id, $channel_name);
+}
+
+sub save_channel_by_id {
+    my ($channel_id, $channel_name, %args) = @_;
+
+    # Validate the channel ID
+    if (not defined($channel_id) or not $channel_id =~ /$valid_channel_id_re/) {
+        return;
+    }
+
+    if ($channel_id =~ /$valid_channel_id_re/) {
+        $channel_id = $+{channel_id};
+    }
+
+    if ($args{subscribe} and not exists($subscribed_channels{$channel_id})) {
+        say ":: Subscribed channel: $channel_name" if $yv_obj->get_debug;
+        $subscribed_channels{$channel_id} = $channel_name;
+        write_channels_to_file(\%subscribed_channels, $CONFIG{subscribed_channels_file});
+    }
+
+    # Channel ID already exists in the list
+    if (exists($channels{$channel_id})) {
+        set_usernames() if $args{subscribe};
+        return;
+    }
+
+    # Get the channel name
+    if (not defined($channel_name) or not $channel_name =~ /\S/) {
+        $channel_name = $yv_obj->channel_title_from_id($channel_id) // $channel_id;
+    }
+
+    # Save channel to file
+    say ":: Saving channel: $channel_name" if $yv_obj->get_debug;
+    $channels{$channel_id} = $channel_name;
+    write_channels_to_file(\%channels, $CONFIG{youtube_users_file});
+    set_usernames();
+}
+
+sub add_user_to_favorites {
+    my $selection = $treeview->get_selection() // return;
+    my $iter      = $selection->get_selected() // return;
+
+    my $info = $yv_obj->parse_json_string($liststore->get($iter, 8));
+
+    my $channel_id   = $liststore->get($iter, 6);
+    my $channel_name = $yv_utils->get_channel_title($info);
+
+    save_channel_by_id($channel_id, $channel_name);
+}
+
+sub subscribe_toggle_selected_username {
+
+    my $selection = $users_treeview->get_selection // return;
+    my $iter      = $selection->get_selected       // return;
+
+    my $channel_id   = $users_liststore->get($iter, 0);
+    my $channel_name = $users_liststore->get($iter, 1);
+
+    if (exists $subscribed_channels{$channel_id}) {
+        delete $subscribed_channels{$channel_id};
+        $users_liststore->set($iter, [3], [$user_icon_pixbuf]);
+    }
+    else {
+        $subscribed_channels{$channel_id} = $channel_name;
+        $users_liststore->set($iter, [3], [$feed_icon_pixbuf]);
+    }
+
+    write_channels_to_file(\%subscribed_channels, $CONFIG{subscribed_channels_file});
+}
+
+sub remove_selected_username {
+
+    my $selection  = $users_treeview->get_selection // return;
+    my $iter       = $selection->get_selected       // return;
+    my $channel_id = $users_liststore->get($iter, 0);
+
+    delete $channels{$channel_id};
+    delete $subscribed_channels{$channel_id};
+
+    $users_liststore->remove($iter);
+
+    write_channels_to_file(\%channels,            $CONFIG{youtube_users_file});
+    write_channels_to_file(\%subscribed_channels, $CONFIG{subscribed_channels_file});
+}
+
+sub write_channels_to_file {
+    my ($channels, $file) = @_;
+
+    open(my $fh, '>:utf8', $file) or return;
+
+    foreach my $channel (
+                         sort { CORE::fc($channels->{$a} // $a) cmp CORE::fc($channels->{$b} // $b) }
+                         keys %$channels
+      ) {
+        if (defined($channels->{$channel})) {
+            say $fh "$channel $channels->{$channel}";
+        }
+        else {
+            say $fh "$channel $channel";
+        }
+    }
+
+    close $fh;
+}
+
+sub save_usernames_to_file {
+
+    set_usernames();    # update channels
+
+    write_channels_to_file(\%channels,            $CONFIG{youtube_users_file});
+    write_channels_to_file(\%subscribed_channels, $CONFIG{subscribed_channels_file});
+}
+
+# Get playlists from username
+sub playlists_from_selected_username {
+    my $selection = $users_treeview->get_selection() // return;
+    my $iter      = $selection->get_selected()       // return;
+
+    my $type    = $users_liststore->get($iter, 2);
+    my $channel = $users_liststore->get($iter, 0);
+
+    playlists($type, $channel);
+}
+
+sub videos_from_selected_username {
+    my $selection = $users_treeview->get_selection() // return;
+    my $iter      = $selection->get_selected()       // return;
+
+    my $type    = $users_liststore->get($iter, 2);
+    my $channel = $users_liststore->get($iter, 0);
+
+    uploads($type, $channel);
+}
+
+sub videos_from_saved_channel {
+    hide_users_list_window();
+    videos_from_selected_username();
+}
+
+# ----- My panel settings ----- #
+
+sub change_subscription_page {
+    my ($value) = @_;
+    foreach my $object (qw(subsc_scrollwindow subsc_label)) {
+        $value
+          ? $gui->get_object($object)->show
+          : $gui->get_object($object)->hide;
+    }
+    return 1;
+}
+
+sub subscriptions_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    subscriptions($type, $username);
+}
+
+sub favorites_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    favorites($type, $username);
+}
+
+sub uploads_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    uploads($type, $username);
+}
+
+sub likes_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    likes($type, $username);
+}
+
+sub dislikes_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    dislikes($type, $username);
+}
+
+sub playlists_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    playlists($type, $username);
+}
+
+sub activity_button {
+    my $type     = $panel_account_type_combobox->get_active_text;
+    my $username = $panel_user_entry->get_text;
+    activities($type, $username);
+}
+
+sub popular_uploads {
+    my ($type, $channel) = @_;
+
+    if ($type =~ /^user/) {
+        $channel = $yv_obj->channel_id_from_username($channel) // die "Invalid username <<$channel>>\n";
+    }
+
+    my $results = $yv_obj->popular_videos($channel);
+
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+    }
+    else {
+        die "No popular uploads for channel: <<$channel>>\n";
+    }
+}
+
+{
+    no strict 'refs';
+    foreach my $name (qw(favorites uploads likes dislikes playlists subscriptions activities)) {
+        *{__PACKAGE__ . '::' . $name} = sub {
+            my ($type, $channel) = @_;
+
+            my $method = $name;
+
+            if ($yv_utils->is_channelID($channel)) {
+                $method = $name;
+            }
+            elsif ($type =~ /^user/i and $channel ne 'mine' and $channel =~ /^\S+\z/) {
+                $method = $name . '_from_username';
+            }
+            elsif ($type =~ /^channel/i and $channel ne 'mine' and $channel =~ /^\S+\z/) {
+                $method = $name . '_from_username';
+            }
+
+            if ($type =~ /^(mine|myself)/i) {
+                if ($name eq 'likes') {
+                    $method = 'my_likes';
+                }
+
+                if ($name eq 'playlists') {
+                    $method = 'my_playlists';
+                }
+
+                if ($name eq 'activities') {
+                    $method = 'my_activities';
+                }
+            }
+
+            if ($name eq 'dislikes') {
+                $method = 'my_dislikes';
+            }
+
+            my $request = $yv_obj->$method(
+                                           ($type =~ /^(user|channel)/i and $channel =~ /^\S+\z/)
+                                           ? $channel
+                                           : ()
+                                          );
+
+            if ($yv_utils->has_entries($request)) {
+                display_results($request);
+            }
+            else {
+                die "No $name results" . ($channel ? " for channel: <<$channel>>\n" : "\n");
+            }
+
+            return 1;
+        };
+    }
+}
+
+sub get_selected_entry_code {
+    my (%options) = @_;
+    my $iter = $treeview->get_selection->get_selected // return;
+
+    if (exists $options{type}) {
+        my $type = $liststore->get($iter, 7) // return;
+        $type eq $options{type} or return;
+    }
+
+    my $code = $liststore->get($iter, 3);
+    return wantarray ? ($code, $iter) : $code;
+}
+
+sub check_keywords {
+    my ($key) = @_;
+
+    if ($key =~ /$get_video_id_re/o) {
+        my $info = $yv_obj->video_details($+{video_id});
+        if (ref($info) eq 'HASH' and keys %$info) {
+            play_video($info) || return;
+        }
+        else {
+            return;
+        }
+    }
+    elsif ($key =~ /$get_playlist_id_re/o) {
+        list_playlist($+{playlist_id});
+    }
+    elsif ($key =~ /$get_channel_playlists_id_re/) {
+        list_channel_playlists($+{channel_id});
+    }
+    elsif ($key =~ /$get_channel_videos_id_re/) {
+        list_channel_videos($+{channel_id});
+    }
+    elsif ($key =~ /$get_username_playlists_re/) {
+        list_username_playlists($+{username});
+    }
+    elsif ($key =~ /$get_username_videos_re/) {
+        list_username_videos($+{username});
+    }
+    else {
+        return;
+    }
+
+    return 1;
+}
+
+sub search {
+    my $keywords = $search_entry->get_text();
+
+    return if check_keywords($keywords);
+
+    # Remember the input text when "history" is enabled
+    if ($CONFIG{history}) {
+        append_to_history($keywords, 1);
+    }
+
+    # Set the username
+    my $username = $from_author_entry->get_text;
+
+    if ($username =~ /^[\w\-]+\z/) {
+        my $id = $username;
+
+        if (not $yv_utils->is_channelID($id)) {
+            $id = $yv_obj->channel_id_from_username($id) // undef;
+        }
+
+        $yv_obj->set_channelId($id);
+    }
+    else {
+        $yv_obj->set_channelId();
+    }
+
+    my $type = $search_for_combobox->get_active_text;
+    display_results($yv_obj->search_for($type, $keywords));
+
+    return 1;
+}
+
+sub encode_entities {
+    my ($text) = @_;
+
+    return q{} if not defined $text;
+
+    $text =~ s/&/&amp;/g;
+    $text =~ s/</&lt;/g;
+    $text =~ s/>/&gt;/g;
+
+    return $text;
+}
+
+sub decode_entities {
+    my ($text) = @_;
+
+    return q{} if not defined $text;
+
+    $text =~ s/&amp;/&/g;
+    $text =~ s/&lt;/</g;
+    $text =~ s/&gt;/>/g;
+
+    return $text;
+}
+
+sub get_code {
+    my ($code, $iter) = get_selected_entry_code();
+
+    $code // return;
+
+    Glib::Idle->add(
+        sub {
+            my ($code, $iter) = @{$_[0]};
+
+            my $type = $liststore->get($iter, 7);
+
+            if ($type eq 'playlist') {
+                list_playlist($code);
+            }
+            elsif ($type eq 'channel' or $type eq 'subscription') {
+                uploads('channel', $code);
+            }
+            elsif ($type eq 'next_page' and $code ne '') {
+
+                my $results;
+                my $next_page_token = $liststore->get($iter, 5);
+
+                if (substr($next_page_token, 0, 4) eq 'json') {
+                    my ($format, $json_data) = split(' ', $next_page_token, 2);
+
+                    if ($format eq 'json-deflate') {
+                        state $has_rawinflate = do {
+                            require MIME::Base64;
+                            require IO::Uncompress::RawInflate;
+                        };
+                        say STDERR ":: Decompressing JSON data with RawInflate..." if $yv_obj->get_debug;
+                        IO::Uncompress::RawInflate::rawinflate(\MIME::Base64::decode_base64($json_data), \my $buffer)
+                          or die "rawinflate failed: $IO::Uncompress::RawInflate::RawInflateError\n";
+                        $json_data = $buffer;
+                    }
+
+                    my $data = $yv_obj->parse_json_string($json_data);
+                    $results = get_results_from_list(%$data);
+                }
+                else {
+                    $results = $yv_obj->next_page($code, $next_page_token);
+                }
+
+                if ($yv_utils->has_entries($results)) {
+                    my $label = '<big><b>' . ('=' x 20) . '</b></big>';
+                    $liststore->set($iter, 0 => $label, 3 => "");
+                }
+                else {
+                    $liststore->remove($iter);
+                    die "This is the last page!\n";
+                }
+
+                display_results($results);
+            }
+            elsif ($type eq 'video') {
+                $CONFIG{audio_only}
+                  ? execute_cli_lbry_viewer("--id=$code")
+                  : play_video($yv_obj->parse_json_string($liststore->get($iter, 8)));
+            }
+
+            return 0;
+        },
+        [$code, $iter],
+        Glib::G_PRIORITY_LOW
+    );
+}
+
+sub make_row_description {
+    join(q{ }, split(q{ }, $_[0])) =~ s/(.)\1{3,}/$1/sgr;
+}
+
+sub append_next_page {
+    my ($url, $token) = @_;
+
+    if (ref($token) ne 'CODE') {
+        $url // return;
+    }
+
+    $token // return;    # no next page is available
+
+    my $iter = $liststore->append;
+
+    $liststore->set(
+                    $iter,
+                    0 => "<big><b>NEXT PAGE</b></big>",
+                    3 => $url,
+                    5 => $token,
+                    7 => 'next_page',
+                   );
+
+    return $iter;
+}
+
+sub determine_image_format {
+    #
+    ## Code from: https://metacpan.org/release/Image-Info/source/lib/Image/Info.pm
+    #
+
+    local ($_) = @_;
+    return "JPEG" if /^\xFF\xD8/;
+    return "PNG"  if /^\x89PNG\x0d\x0a\x1a\x0a/;
+    return "GIF"  if /^GIF8[79]a/;
+    return "TIFF" if /^MM\x00\x2a/;
+    return "TIFF" if /^II\x2a\x00/;
+    return "BMP"  if /^BM/;
+    return "ICO"  if /^\000\000\001\000/;
+    return "PPM"  if /^P[1-6]/;
+    return "XPM"  if /(^\/\* XPM \*\/)|(static\s+char\s+\*\w+\[\]\s*=\s*{\s*"\d+)/;
+    return "XBM"  if /^(?:\/\*.*\*\/\n)?#define\s/;
+    return "SVG"  if /^(<\?xml|[\012\015\t ]*<svg\b)/;
+    return "WEBP" if /^RIFF.{4}WEBP/s;
+    return undef;
+}
+
+sub lwp_get {
+    my ($url) = @_;
+
+    state %cache;
+
+    my $data = $cache{$url} // $yv_obj->lwp_get($url, simple => 1);
+    $cache{$url} = $data if defined($data);
+    return $data;
+}
+
+sub get_pixbuf_thumbnail_from_content {
+    my ($thumbnail, $xsize, $ysize) = @_;
+
+    $xsize //= 160;
+    $ysize //= 90;
+
+    require Digest::MD5;
+
+    my $md5 = Digest::MD5::md5_hex($thumbnail // return $default_thumb);
+    my $key = "$md5 $xsize $ysize";
+
+    state %cache;
+
+    if (exists $cache{$key}) {
+        return $cache{$key};
+    }
+
+    my $pixbuf;
+    if (defined $thumbnail) {
+        my $type = determine_image_format($thumbnail);
+
+        my $pixbufloader;
+        if (defined($type)) {
+            $pixbufloader = eval { 'Gtk3::Gdk::PixbufLoader'->new_with_type(lc($type)) };
+        }
+        if (not defined $pixbufloader) {
+            $pixbufloader = 'Gtk3::Gdk::PixbufLoader'->new;
+        }
+
+        eval {
+            $pixbufloader->set_size($xsize, $ysize);
+            ## $pixbufloader->write($thumbnail);      # Gtk3 bug?
+            $pixbufloader->write([unpack 'C*', $thumbnail]);
+            $pixbuf = $pixbufloader->get_pixbuf;
+            $pixbufloader->close;
+        };
+    }
+
+    if (defined($pixbuf)) {
+        $cache{$key} = $pixbuf;
+    }
+
+    $pixbuf //= $default_thumb;
+
+    return $pixbuf;
+}
+
+sub get_pixbuf_thumbnail_from_url {
+    my ($url, $xsize, $ysize) = @_;
+
+    state %cache;
+
+    my $key = "$url $xsize $ysize";
+
+    if (exists $cache{$key}) {
+        return $cache{$key};
+    }
+
+    my $thumbnail = lwp_get($url);
+
+    if (not defined($thumbnail)) {
+        if ($url =~ s{/mq([0-9])\.}{/$1.}) {
+            $thumbnail = lwp_get($url);
+        }
+    }
+
+    my $pixbuf = get_pixbuf_thumbnail_from_content($thumbnail, $xsize, $ysize);
+
+    if (defined($pixbuf)) {
+        $cache{$key} = $pixbuf;
+    }
+
+    return $pixbuf;
+}
+
+sub get_pixbuf_thumbnail_from_entry {
+    my ($entry) = @_;
+
+    my $thumbnail_url  = $yv_utils->get_thumbnail_url($entry, $CONFIG{thumbnail_type});
+    my $thumbnail_data = ($entry->{_thumbnail_data} ||= lwp_get($thumbnail_url));
+
+    # Don't cache thumbnails that failed to be retrieved.
+    if (not $entry->{_thumbnail_data}) {
+        delete $entry->{_thumbnail_data};
+    }
+
+    my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
+    my $pixbuf        = get_pixbuf_thumbnail_from_content($thumbnail_data, ($square_format ? (160, 160) : ()));
+
+    return $pixbuf;
+}
+
+sub get_results_from_list {
+    my (%args) = @_;
+
+    $args{entries} //= [];
+    $args{page}    //= $yv_obj->get_page;
+
+    my @results = @{$args{entries}};
+
+    my $maxResults   = $yv_obj->get_maxResults;
+    my $totalResults = scalar(@results);
+
+    if ($args{page} >= 1 and scalar(@results) >= $maxResults) {
+        @results = grep { defined } @results[($args{page} - 1) * $maxResults .. $args{page} * $maxResults - 1];
+    }
+
+    my %results;
+    my @entries;
+
+    foreach my $entry (@results) {
+        if (defined($args{callback})) {
+            push @entries, $args{callback}($entry);
+        }
+        else {
+            push @entries, $entry;
+        }
+    }
+
+    $results{entries} = \@entries;
+
+    #$results{pageInfo} = {resultsPerPage => scalar(@entries), totalResults => $totalResults};
+
+    if ($args{page} * $maxResults < $totalResults) {
+
+        my $json_str = $yv_obj->make_json_string(
+                                                 {
+                                                  %args, page => $args{page} + 1,
+                                                 }
+                                                );
+
+        state $has_rawdeflate = $CONFIG{remember_session} && eval {
+            require MIME::Base64;
+            require IO::Compress::RawDeflate;
+            require IO::Uncompress::RawInflate;
+            1;
+        };
+
+        if ($has_rawdeflate) {
+            say STDERR ":: Compressing JSON data with RawDeflate..." if $yv_obj->get_debug;
+            IO::Compress::RawDeflate::rawdeflate(\$json_str, \my $json_raw_deflate)
+              or die "rawdeflate failed: $IO::Compress::RawDeflate::RawDeflateError\n";
+            $results{continuation} = 'json-deflate ' . MIME::Base64::encode_base64($json_raw_deflate);
+        }
+        else {
+            $results{continuation} = 'json ' . $json_str;
+        }
+    }
+
+    scalar {results => \%results, url => 'file'};
+}
+
+sub videos_from_data_file {
+    my ($file, %args) = @_;
+
+    my $videos = eval { Storable::retrieve($file) } // [];
+
+    if ($args{reverse}) {
+        $videos = [reverse @$videos];
+    }
+
+    foreach my $entry (@$videos) {
+        if (ref($entry->{timestamp} // '') eq 'Time::Piece') {
+            $entry->{timestamp} = [@{$entry->{timestamp}}];
+        }
+    }
+
+    get_results_from_list(entries => $videos);
+}
+
+sub get_subscription_video_results {
+
+    state $t0 = time;
+    state $d0 = $t0;
+
+    # Reuse the subscription file if it's less than 10 minutes old
+    if (    $t0 != $d0
+        and (time - $t0 <= $CONFIG{subscriptions_lifetime})
+        and (-f $subscription_videos_data_file)
+        and (-M $subscription_videos_data_file) < ((-M $CONFIG{subscribed_channels_file}) // 0)) {
+        return videos_from_data_file($subscription_videos_data_file);
+    }
+
+    $t0 = time + 1;
+
+    my @channels = $yv_utils->read_channels_from_file($CONFIG{subscribed_channels_file});
+
+    if (not @channels) {
+        warn "\n[!] No subscribed channels...\n";
+        return get_results_from_list(entries => []);
+    }
+
+    my %subscriptions;
+
+    require Time::Piece;
+    my $time = Time::Piece->new();
+
+    my @items;
+    foreach my $i (0 .. $#channels) {
+
+        local $| = 1;
+        printf("[%d/%d] Retrieving info for $channels[$i][1]...\n", $i + 1, $#channels + 1);
+
+        my $id      = $channels[$i][0]      // next;
+        my $uploads = $yv_obj->uploads($id) // next;
+
+        my $videos = $uploads->{results} // [];
+
+        if (ref($videos) eq 'HASH' and exists $videos->{videos}) {
+            $videos = $videos->{videos};
+        }
+
+        if (ref($videos) eq 'HASH' and exists $videos->{entries}) {
+            $videos = $videos->{entries};
+        }
+
+        if (ref($videos) ne 'ARRAY') {
+            next;
+        }
+
+        $subscriptions{$id} = 1;
+        $subscriptions{lc($id)} = 1;
+
+        foreach my $video (@$videos) {
+            $video->{timestamp} = [@$time];
+        }
+
+        push @items, @$videos;
+    }
+
+    my $subscriptions_data = [];
+
+    if (-f $subscription_videos_data_file) {
+        $subscriptions_data = eval { Storable::retrieve($subscription_videos_data_file) } // [];
+    }
+
+    unshift(@$subscriptions_data, @items);
+
+    # Remove duplicates
+    @$subscriptions_data = do {
+        my %seen;
+        grep { !$seen{$yv_utils->get_video_id($_)}++ } @$subscriptions_data;
+    };
+
+    # Remove videos from unsubscribed channels
+    @$subscriptions_data = grep {
+             exists($subscriptions{$yv_utils->get_channel_id($_)})
+          or exists($subscriptions{lc($yv_utils->get_channel_title($_) // '')})
+    } @$subscriptions_data;
+
+    # Order videos by newest first
+    @$subscriptions_data =
+      map  { $_->[0] }
+      sort { $b->[1] <=> $a->[1] }
+      map  { [$_, $yv_utils->get_publication_time($_)] } @$subscriptions_data;
+
+    # Remove results from the end when the list becomes too large
+    my $subscriptions_limit = $CONFIG{subscriptions_limit} // 1e4;
+    if ($subscriptions_limit > 0 and scalar(@$subscriptions_data) > $subscriptions_limit) {
+        $#$subscriptions_data = $subscriptions_limit;
+    }
+
+    foreach my $entry (@$subscriptions_data) {
+        if (ref($entry->{timestamp} // '') eq 'Time::Piece') {
+            $entry->{timestamp} = [@{$entry->{timestamp}}];
+        }
+    }
+
+    if (@$subscriptions_data) {
+        Storable::store([grep { $yv_utils->get_time($_) ne 'LIVE' } @$subscriptions_data], $subscription_videos_data_file);
+    }
+
+    get_results_from_list(entries => $subscriptions_data);
+}
+
+sub get_watched_video_results {
+    videos_from_data_file($watch_history_data_file);
+}
+
+sub display_watched_videos {
+    display_results(get_watched_video_results());
+}
+
+sub display_subscription_videos {
+    display_results(get_subscription_video_results());
+}
+
+sub display_results {
+    my ($results, $from_history) = @_;
+
+    my $url = $results->{url};
+
+    #my $info  = $results->{results} // {};
+    my $items = $results->{results} // [];
+
+    if (ref($items) eq 'HASH') {
+
+        if (exists $items->{videos}) {
+            $items = $items->{videos};
+        }
+        elsif (exists $items->{playlists}) {
+            $items = $items->{playlists};
+        }
+        elsif (exists $items->{channels}) {
+            $items = $items->{channels};
+        }
+        elsif (exists $items->{entries}) {
+            $items = $items->{entries};
+        }
+        else {
+            warn "No results...\n";
+        }
+    }
+
+    if (ref($items) ne 'ARRAY') {
+        die "Probably the selected invidious instance is down.\n"
+          . "\nTry changing the `api_host` in configuration file:\n\n"
+          . qq{\tapi_host => "auto",\n}
+          . qq{\nSee also: https://github.com/trizen/lbry-viewer#librarian-instances\n};
+    }
+
+    if (not $yv_utils->has_entries($results)) {
+        die "No results...\n";
+    }
+
+    $liststore->clear if $CONFIG{clear_search_list};
+
+    if (@$items) {
+        add_results_to_history($results) if not $from_history;
+    }
+
+    #~ if (not $from_history) {
+
+    #~ foreach my $entry (@$items) {
+    #~ if ($yv_utils->is_activity($entry)) {
+    #~ my $type = $entry->{snippet}{type};
+
+    #~ if ($type eq 'upload') {
+    #~ $entry->{kind} = 'youtube#video';
+    #~ $entry->{id}   = $entry->{contentDetails}{upload}{videoId};
+    #~ }
+
+    #~ if ($type eq 'playlistItem') {
+    #~ $entry->{kind} = 'youtube#video';
+    #~ $entry->{id}   = $entry->{contentDetails}{playlistItem}{resourceId}{videoId};
+    #~ }
+
+    #~ if ($type eq 'subscription') {
+    #~ $entry->{kind}               = 'youtube#channel';
+    #~ $entry->{snippet}{title}     = $entry->{snippet}{channelTitle};
+    #~ $entry->{snippet}{channelId} = $entry->{contentDetails}{subscription}{resourceId}{channelId};
+    #~ }
+
+    #~ if ($type eq 'bulletin' and $entry->{contentDetails}{bulletin}{resourceId}{kind} eq 'youtube#video') {
+    #~ $entry->{kind} = 'youtube#video';
+    #~ $entry->{id}   = $entry->{contentDetails}{bulletin}{resourceId}{videoId};
+    #~ }
+    #~ }
+    #~ }
+
+    #~ my @video_ids;
+    #~ my @playlist_ids;
+
+    #~ foreach my $i (0 .. $#{$items}) {
+    #~ my $item = $items->[$i];
+
+    #~ if ($yv_utils->is_playlist($item)) {
+    #~ push @playlist_ids, $yv_utils->get_playlist_id($item);
+    #~ }
+    #~ elsif ($yv_utils->is_video($item)) {
+    #~ push @video_ids, $yv_utils->get_video_id($item);
+    #~ }
+    #~ }
+
+    #~ my %id_lookup;
+
+    #~ if (@video_ids) {
+    #~ my $content_details = $yv_obj->video_details(join(',', @video_ids), VIDEO_PART);
+    #~ my $video_details   = $content_details->{results}{items};
+
+    #~ foreach my $i (0 .. $#video_ids) {
+    #~ $id_lookup{$video_ids[$i]} = $video_details->[$i];
+    #~ }
+    #~ }
+
+    #~ if (@playlist_ids) {
+    #~ my $content_details  = $yv_obj->playlist_from_id(join(',', @playlist_ids), 'contentDetails');
+    #~ my $playlist_details = $content_details->{results}{items};
+
+    #~ foreach my $i (0 .. $#playlist_ids) {
+    #~ $id_lookup{$playlist_ids[$i]} = $playlist_details->[$i];
+    #~ }
+    #~ }
+
+    #~ $info->{__extra_info__} = \%id_lookup;
+    #~ }
+
+    foreach my $i (0 .. $#{$items}) {
+        my $item = $items->[$i];
+
+        if ($yv_utils->is_playlist($item)) {
+
+            #~ my $playlist_id = $yv_utils->get_playlist_id($item) || next;
+
+            #~ if (exists($info->{__extra_info__}{$playlist_id})) {
+            #~ @{$item}{qw(contentDetails)} =
+            #~ @{$info->{__extra_info__}{$playlist_id}}{qw(contentDetails)};
+            #~ }
+
+            add_playlist_entry($item);
+        }
+        elsif ($yv_utils->is_channel($item)) {
+            add_channel_entry($item);
+        }
+        elsif ($yv_utils->is_subscription($item)) {
+            add_subscription_entry($item);
+        }
+        elsif ($yv_utils->is_video($item)) {
+
+            #~ my $video_id = $yv_utils->get_video_id($item) || next;
+
+            #~ if (exists($info->{__extra_info__}{$video_id})) {
+            #~ @{$item}{qw(id contentDetails statistics snippet)} =
+            #~ @{$info->{__extra_info__}{$video_id}}{qw(id contentDetails statistics snippet)};
+            #~ }
+
+            # Filter out private or deleted videos
+            #$yv_utils->get_video_id($item) || next;
+
+            # Filter out videos with time '00:00'
+            #$yv_utils->get_time($item) eq '00:00' and next;
+
+            # Mark as video
+            #$item->{__is_video__} = 1;
+
+            # Store the video title to history (when `save_titles_to_history` is true)
+            if ($CONFIG{save_titles_to_history}) {
+                append_to_history($yv_utils->get_title($item), 0);
+            }
+
+            add_video_entry($item);
+        }
+    }
+
+    if (ref($results->{results}) eq 'HASH' and exists($results->{results}{continuation})) {
+        if (defined $results->{results}{continuation}) {
+            append_next_page($url, $results->{results}{continuation});
+        }
+    }
+    else {
+        append_next_page($url);
+    }
+}
+
+sub set_entry_tooltip {
+    my ($iter, $title, $description) = @_;
+
+    $CONFIG{tooltips} || return 1;
+
+    if ($CONFIG{tooltip_max_len} > 0 and length($description) > $CONFIG{tooltip_max_len}) {
+        $description = substr($description, 0, $CONFIG{tooltip_max_len}) . '...';
+    }
+
+    $description =~ s/(?:\R\s*\R)+/\n\n/g;    # replace 2+ consecutive newlines with "\n\n"
+
+    $liststore->set($iter, [9], ["<b>" . encode_entities($title) . "</b>" . "\n\n" . encode_entities($description)]);
+}
+
+sub set_thumbnail {
+    my ($entry, $liststore, $iter) = @_;
+
+    $liststore->set($iter, [1], [$default_thumb]);
+
+    Glib::Idle->add(
+        sub {
+            my ($entry, $liststore, $iter) = @{$_[0]};
+            my $pixbuf = get_pixbuf_thumbnail_from_entry($entry);
+            $liststore->set($iter, [1], [$pixbuf]);
+            return 0;
+        },
+        [$entry, $liststore, $iter],
+        Glib::G_PRIORITY_LOW
+    );
+}
+
+sub add_subscription_entry {
+    my ($subscription) = @_;
+
+    my $iter            = $liststore->append;
+    my $title           = $yv_utils->get_title($subscription);
+    my $channel_id      = $yv_utils->get_channel_id($subscription);
+    my $description     = $yv_utils->get_description($subscription);
+    my $row_description = make_row_description($description);
+
+    set_entry_tooltip($iter, $title, $description);
+
+    my $title_label =
+        '<big><b>'
+      . encode_entities($title)
+      . "</b></big>\n\n"
+      . "$symbols{author}\t "
+      . encode_entities($channel_id) . "\n"
+      . "$symbols{published}\t "
+      . ($yv_utils->get_publication_date($subscription) // 'unknown')
+      . "\n\n<i>"
+      . encode_entities($row_description) . '</i>';
+
+    my $type_label = "$symbols{type}\t " . 'Subscription' . "\n";
+
+    $liststore->set(
+                    $iter,
+                    0 => $title_label,
+                    2 => $type_label,
+                    3 => $channel_id,
+                    4 => encode_entities($description),
+                    6 => $channel_id,
+                    7 => 'subscription',
+                    8 => $yv_obj->make_json_string($subscription),
+                   );
+
+    if ($CONFIG{show_thumbs}) {
+        set_thumbnail($subscription, $liststore, $iter);
+    }
+}
+
+sub reflow_text {
+    my ($text) = @_;
+    $text =~ s/^/&#x200e;/gmr;
+}
+
+sub add_video_entry {
+    my ($video) = @_;
+
+    my $iter            = $liststore->append;
+    my $title           = $yv_utils->get_title($video);
+    my $video_id        = $yv_utils->get_video_id($video);
+    my $channel_id      = $yv_utils->get_channel_id($video);
+    my $description     = $yv_utils->get_description($video);
+    my $row_description = make_row_description($description);
+
+    set_entry_tooltip($iter, $title, $description);
+
+    my $title_label = reflow_text(
+                                  sprintf("<big><b>%s</b></big>", encode_entities($title)) . "\n\n"
+                                    . join(
+                                           "\n",
+                                           map { sprintf("%s   %s", $_->[0], $_->[1]) } (
+                                               [$symbols{author}    => encode_entities($yv_utils->get_channel_title($video))],
+                                               [$symbols{published} => ($yv_utils->get_publication_date($video) // 'unknown')],
+                                           )
+                                          )
+                                    . "\n\n"
+                                    . sprintf("<i>%s</i>", encode_entities($row_description))
+                                 );
+
+    my $info_label = reflow_text(
+                                 join(
+                                      "\n",
+                                      map { sprintf("%s   %s", $_->[0], $_->[1]) } (
+                                                   [$symbols{play}  => $yv_utils->get_time($video)],
+                                                   [$symbols{views} => $yv_utils->set_thousands($yv_utils->get_views($video))],
+                                      )
+                                     )
+                                );
+
+    $liststore->set(
+                    $iter,
+                    0 => $title_label,
+                    2 => $info_label,
+                    3 => $video_id,
+                    4 => encode_entities($description),
+                    6 => $channel_id,
+                    7 => 'video',
+                    8 => $yv_obj->make_json_string($video),
+                   );
+
+    if ($CONFIG{show_thumbs}) {
+        set_thumbnail($video, $liststore, $iter);
+    }
+}
+
+sub add_channel_entry {
+    my ($channel) = @_;
+
+    my $iter            = $liststore->append;
+    my $title           = $yv_utils->get_channel_title($channel);
+    my $channel_id      = $yv_utils->get_channel_id($channel);
+    my $description     = $yv_utils->get_description($channel);
+    my $row_description = make_row_description($description);
+
+    set_entry_tooltip($iter, $title, $description);
+
+    my $title_label = reflow_text(
+        sprintf(
+            "<big><b>%s</b></big>
+
+$symbols{author}\t %s
+$symbols{author_id}\t %s
+
+<i>%s</i>",
+            encode_entities($title),
+            encode_entities($title),
+            encode_entities($channel_id),
+            encode_entities($row_description),
+               )
+    );
+
+    my $type_label = reflow_text(
+        sprintf(
+            "$symbols{type}\t Channel
+$symbols{video}\t %s videos
+$symbols{subs}\t %s subs",
+
+            $yv_utils->set_thousands($yv_utils->get_video_count($channel)),
+            $yv_utils->short_human_number($yv_utils->get_subscriber_count($channel)),
+               )
+    );
+
+    $liststore->set(
+                    $iter,
+                    0 => $title_label,
+                    2 => $type_label,
+                    3 => $channel_id,
+                    4 => encode_entities($description),
+                    6 => $channel_id,
+                    7 => 'channel',
+                    8 => $yv_obj->make_json_string($channel),
+                   );
+
+    if ($CONFIG{show_thumbs}) {
+        set_thumbnail($channel, $liststore, $iter);
+    }
+}
+
+sub add_playlist_entry {
+    my ($playlist) = @_;
+
+    my $iter            = $liststore->append;
+    my $title           = $yv_utils->get_title($playlist);
+    my $channel_id      = $yv_utils->get_channel_id($playlist);
+    my $channel_title   = $yv_utils->get_channel_title($playlist);
+    my $description     = $yv_utils->get_description($playlist);
+    my $playlist_id     = $yv_utils->get_playlist_id($playlist);
+    my $row_description = make_row_description($description);
+
+    set_entry_tooltip($iter, $title, $description);
+
+    my $title_label = reflow_text(
+        sprintf(
+            "<big><b>%s</b></big>
+
+$symbols{author}\t %s
+$symbols{play}\t %s
+
+<i>%s</i>",
+
+            encode_entities($title),
+            encode_entities($channel_title),
+            encode_entities($playlist_id),
+            encode_entities($row_description),
+               )
+    );
+
+    my $type_label = reflow_text(
+        sprintf(
+            "$symbols{type}\t Playlist
+$symbols{video}\t %s videos",
+            $yv_utils->set_thousands($yv_utils->get_playlist_video_count($playlist) // 0)
+               )
+    );
+
+    $liststore->set(
+                    $iter,
+                    0 => $title_label,
+                    2 => $type_label,
+                    3 => $playlist_id,
+                    4 => encode_entities($description),
+                    6 => $channel_id,
+                    7 => 'playlist',
+                    8 => $yv_obj->make_json_string($playlist),
+                   );
+
+    if ($CONFIG{show_thumbs}) {
+        set_thumbnail($playlist, $liststore, $iter);
+    }
+}
+
+sub list_playlist {
+    my ($playlist_id) = @_;
+
+    my $results = $yv_obj->videos_from_playlist_id($playlist_id);
+
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+        return 1;
+    }
+    else {
+        die "[!] Inexistent playlist...\n";
+    }
+    return;
+}
+
+sub list_channel_videos {
+    my ($channel_id) = @_;
+
+    my $results = $yv_obj->uploads($channel_id);
+
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+        return 1;
+    }
+    else {
+        die "[!] No videos for channel ID: $channel_id\n";
+    }
+    return;
+}
+
+sub list_username_videos {
+    my ($username) = @_;
+
+    my $results = $yv_obj->uploads_from_username($username);
+
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+        return 1;
+    }
+    else {
+        die "[!] No videos for user: $username\n";
+    }
+    return;
+}
+
+sub list_channel_playlists {
+    my ($channel_id) = @_;
+
+    my $results = $yv_obj->playlists($channel_id);
+
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+        return 1;
+    }
+    else {
+        die "[!] No playlists for channel ID: $channel_id\n";
+    }
+    return;
+}
+
+sub list_username_playlists {
+    my ($username) = @_;
+
+    my $results = $yv_obj->playlists_from_username($username);
+
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+        return 1;
+    }
+    else {
+        die "[!] No playlists for user: $username\n";
+    }
+    return;
+}
+
+sub favorites_from_text_entry {
+    my ($text_entry) = @_;
+    favorites($channel_type_combobox->get_active_text, $text_entry->get_text);
+}
+
+sub uploads_from_text_entry {
+    my ($text_entry) = @_;
+    uploads($channel_type_combobox->get_active_text, $text_entry->get_text);
+}
+
+sub playlists_from_text_entry {
+    my ($text_entry) = @_;
+    playlists($channel_type_combobox->get_active_text, $text_entry->get_text);
+}
+
+sub likes_from_text_entry {
+    my ($text_entry) = @_;
+    likes($channel_type_combobox->get_active_text, $text_entry->get_text);
+}
+
+sub subscriptions_from_text_entry {
+    my ($text_entry) = @_;
+    subscriptions($channel_type_combobox->get_active_text, $text_entry->get_text);
+}
+
+sub strip_spaces {
+    my ($text) = @_;
+    $text =~ s/^\s+//;
+    return unpack 'A*', $text;
+}
+
+sub get_streaming_url {
+    my ($video_id) = @_;
+
+    my ($urls, $captions, $info) = $yv_obj->get_streaming_urls($video_id);
+
+    if (not defined $urls) {
+        return scalar {};
+    }
+
+    # Download the closed-captions
+    my $srt_file;
+    if (ref($captions) eq 'ARRAY' and @$captions and $CONFIG{get_captions}) {
+        require WWW::LbryViewer::GetCaption;
+        my $yv_cap = WWW::LbryViewer::GetCaption->new(
+                                                      auto_captions => $CONFIG{auto_captions},
+                                                      captions_dir  => $CONFIG{cache_dir},
+                                                      captions      => $captions,
+                                                      languages     => $CONFIG{srt_languages},
+                                                      yv_obj        => $yv_obj,
+                                                     );
+        $srt_file = $yv_cap->save_caption($video_id);
+    }
+
+    require WWW::LbryViewer::Itags;
+    state $yv_itags = WWW::LbryViewer::Itags->new();
+
+    my ($streaming, $resolution) = $yv_itags->find_streaming_url(
+        urls       => $urls,
+        resolution => $CONFIG{resolution},
+
+        hfr        => $CONFIG{hfr},
+        ignore_av1 => $CONFIG{ignore_av1},
+
+        split      => $CONFIG{split_videos},
+        prefer_m4a => $CONFIG{prefer_m4a},
+        dash       => $CONFIG{dash},
+
+        ignored_projections => $CONFIG{ignored_projections},
+    );
+
+    return {
+            streaming  => $streaming,
+            srt_file   => $srt_file,
+            info       => $info,
+            resolution => $resolution,
+           };
+}
+
+sub get_quotewords {
+    require Text::ParseWords;
+    return Text::ParseWords::quotewords(@_);
+}
+
+#---------------------- PLAY AN YOUTUBE VIDEO ----------------------#
+sub get_player_command {
+    my ($video) = @_;
+
+    my %player_args;
+    my $player = $CONFIG{video_players}{$CONFIG{video_player_selected}};
+
+    if (ref($player) ne 'HASH') {
+        die ":: The selected video player does not exist! Check the configuration file.";
+    }
+
+    $player_args{fullscreen} = $CONFIG{fullscreen} ? $player->{fs} : undef;
+    $player_args{arguments}  = $player->{arg};
+
+    my $cmd = join(
+        q{ },
+        (
+            # Video player
+            $player->{cmd},
+
+            # Rest of the arguments
+            (grep { defined($_) and /\S/ } values %player_args)
+        )
+    );
+
+    my $has_video = $cmd =~ /(?:^|\s)\*(?:VIDEO|URL)\*(?:\s|\z)/;
+
+    $cmd = $yv_utils->format_text(
+                                  streaming => undef,
+                                  info      => $video,
+                                  text      => $cmd,
+                                  escape    => 1,
+                                 );
+
+    $has_video ? $cmd : join(' ', $cmd, sprintf($CONFIG{lbry_video_url}, $yv_utils->get_video_id($video)));
+}
+
+sub prepend_video_data_to_file {
+    my ($video_data, $file) = @_;
+
+    my $videos = eval { Storable::retrieve($file) } // [];
+
+    if (ref($video_data) ne 'HASH') {
+        return;
+    }
+
+    $yv_utils->get_video_id($video_data) // return;
+
+    unshift(@$videos, $video_data);
+
+    my %seen;
+    @$videos = grep { !$seen{$yv_utils->get_video_id($_)}++ } @$videos;
+
+    if ($CONFIG{local_playlist_limit} > 0 and scalar(@$videos) > $CONFIG{local_playlist_limit}) {
+        if ($yv_obj->get_debug) {
+            say STDERR ":: Resizing the playlist <<$file>> from $#$videos+1 to $CONFIG{local_playlist_limit} entries.";
+        }
+        $#$videos = $CONFIG{local_playlist_limit} - 1;
+    }
+
+    Storable::store($videos, $file);
+    return 1;
+}
+
+sub save_watched_video {
+    my ($video_id, $video_data) = @_;
+
+    # Store the video title to history (when `save_watched_to_history` is true)
+    if ($CONFIG{save_watched_to_history}) {
+        append_to_history($yv_utils->get_title($video_data), 0);
+    }
+
+    if ($CONFIG{watch_history}) {
+
+        say ":: Saving video <<$video_id>> to watch history..." if ($yv_obj->get_debug);
+
+        if (not exists($WATCHED_VIDEOS{$video_id})) {
+
+            $WATCHED_VIDEOS{$video_id} = 1;
+
+            open my $fh, '>>', $CONFIG{watched_file} or return;
+            say {$fh} $video_id;
+            close $fh;
+        }
+
+        prepend_video_data_to_file($video_data, $watch_history_data_file);
+    }
+
+    $WATCHED_VIDEOS{$video_id} = 1;
+    return 1;
+}
+
+sub play_video {
+    my ($video) = @_;
+
+    my $video_id = $yv_utils->get_video_id($video);
+    my $command  = get_player_command($video);
+
+    my $code = execute_external_program($command);
+
+    if ($code == 0) {
+        save_watched_video($video_id, $video);
+    }
+    else {
+        warn "[!] Can't play this video -- player exited with code: $code\n";
+    }
+
+    return 1;
+}
+
+sub list_category {
+
+    my $iter   = $cat_treeview->get_selection->get_selected;
+    my $cat_id = $cats_liststore->get($iter, 1);
+    my $type   = $cats_liststore->get($iter, 3);
+
+    my $videos = $yv_obj->trending_videos_from_category($cat_id);
+
+    if ($yv_utils->has_entries($videos)) {
+        display_results($videos);
+    }
+    else {
+        die "No video found for categoryID: <$cat_id>\n";
+    }
+}
+
+sub list_local_playlist {
+    my $iter = $playlists_treeview->get_selection->get_selected;
+
+    my $reverse_playlist = $gui->get_object('reverse_playlist')->get_active;
+    my $playlist_file    = $playlists_liststore->get($iter, 3);
+
+    my $results = videos_from_data_file($playlist_file, reverse => $reverse_playlist);
+    display_results($results);
+}
+
+sub clear_text {
+    my ($entry) = @_;
+
+    if ($entry->get_text() =~ /\.\.\.\z/ or $CONFIG{clear_text_entries_on_click}) {
+        $entry->set_text('');
+    }
+
+    return 0;
+}
+
+sub run_cli_lbry_viewer {
+    execute_cli_lbry_viewer('--interactive');
+}
+
+sub get_options_as_arguments {
+    my @args;
+    my %options = (
+                   'no-interactive' => q{},
+                   'resolution'     => $CONFIG{resolution},
+                   'download-dir'   => quotemeta(rel2abs($CONFIG{downloads_dir})),
+                   'fullscreen'     => $CONFIG{fullscreen} ? q{}   : undef,
+                   'no-dash'        => $CONFIG{dash}       ? undef : q{},
+                   'no-video'       => $CONFIG{audio_only} ? q{}   : undef,
+                  );
+
+    while (my ($argv, $value) = each %options) {
+        push(
+            @args,
+            do {
+                $value              ? '--' . $argv . '=' . $value
+                  : defined($value) ? '--' . $argv
+                  :                   next;
+            }
+        );
+    }
+    return @args;
+}
+
+sub execute_external_program {
+    my ($cmd) = @_;
+
+    if ($CONFIG{prefer_fork} and defined(my $pid = fork())) {
+        if ($pid == 0) {
+            say "** Forking process: $cmd" if $yv_obj->get_debug;
+            $yv_obj->proxy_exec($cmd);
+        }
+    }
+    else {
+        say "** Backgrounding process: $cmd" if $yv_obj->get_debug;
+        $yv_obj->proxy_system($cmd . ' &');
+    }
+}
+
+sub make_youtube_url {
+    my ($type, $code) = @_;
+
+    my $format = (
+                    ($type eq 'subscription' || $type eq 'channel') ? $CONFIG{lbry_channel_url}
+                  : $type eq 'video'                                ? $CONFIG{lbry_video_url}
+                  : $type eq 'playlist'                             ? $CONFIG{lbry_playlist_url}
+                  :                                                   ()
+                 );
+
+    if (defined $format) {
+        return sprintf($format, $code);
+    }
+
+    return "https://www.youtube.com";
+}
+
+sub open_external_url {
+    my ($url) = @_;
+
+    my $exit_code =
+      execute_external_program(join(q{ }, $CONFIG{web_browser} // $ENV{WEBBROWSER} // 'xdg-open', quotemeta($url)));
+
+    if ($exit_code != 0) {
+        warn "Can't open URL <<$url>> -- exit code: $exit_code\n";
+    }
+
+    return 1;
+}
+
+sub enqueue_video {
+    my $video_id = get_selected_entry_code(type => 'video') // return;
+    print "[*] Added: <$video_id>\n" if $yv_obj->get_debug;
+    push @VIDEO_QUEUE, $video_id;
+    return 1;
+}
+
+sub play_enqueued_videos {
+    if (@VIDEO_QUEUE) {
+        execute_cli_lbry_viewer('--video-ids=' . join(q{,}, splice @VIDEO_QUEUE));
+    }
+    return 1;
+}
+
+sub play_selected_video_with_cli_lbry_viewer {
+    my ($code, $iter) = get_selected_entry_code();
+    $code // return;
+
+    my $type = $liststore->get($iter, 7);
+
+    if ($type eq 'video') {
+        execute_cli_lbry_viewer("--video-id=$code");
+    }
+    elsif ($type eq 'playlist') {
+        execute_cli_lbry_viewer("--pp=$code");
+    }
+    else {
+        warn "Can't play $type: $code\n";
+    }
+
+    return 1;
+}
+
+sub execute_cli_lbry_viewer {
+    my @arguments = @_;
+
+    my $command = join(
+                       q{ },
+                       $CONFIG{terminal},
+                       sprintf(
+                               $CONFIG{terminal_exec},
+                               join(q{ },
+                                    $CONFIG{lbry_viewer}, get_options_as_arguments(),
+                                    @arguments,           @{$CONFIG{lbry_viewer_args}}),
+                              )
+                      );
+    my $code = execute_external_program($command);
+
+    say $command if $yv_obj->get_debug;
+
+    warn "lbry-viewer - exit code: $code\n" if $code != 0;
+    return 1;
+}
+
+sub download_video {
+    my $code = get_selected_entry_code(type => 'video') // return;
+    execute_cli_lbry_viewer("--video-id=$code", '--download');
+    return 1;
+}
+
+sub comments_row_activated {
+
+    my $iter = $feeds_treeview->get_selection->get_selected() or return;
+    my $url  = $feeds_liststore->get($iter, 1);
+
+    if (defined($url) and $url =~ m{^https?://}) {    # load more comments
+
+        my $token = $feeds_liststore->get($iter, 2);
+        $feeds_liststore->remove($iter);
+        my $results = $yv_obj->next_page_with_token($url, $token);
+
+        if ($yv_utils->has_entries($results)) {
+            display_comments($results);
+        }
+        else {
+            die "This is the last page of comments.\n";
+        }
+
+        return 1;
+    }
+
+    my $video_id   = $feeds_liststore->get($iter, 3);
+    my $comment_id = $feeds_liststore->get($iter, 4);
+
+    my $comment_url = sprintf("https://www.youtube.com/watch?v=%s&lc=%s", $video_id, $comment_id);
+
+    open_external_url($comment_url);
+
+    return 1;
+}
+
+sub show_user_favorite_videos {
+    my $username = get_channel_id_for_selected_video() // return;
+    favorites('channel', $username);
+}
+
+sub get_channel_id_for_selected_video {
+    my $selection = $treeview->get_selection() // return;
+    my $iter      = $selection->get_selected() // return;
+    $liststore->get($iter, 6);
+}
+
+sub show_related_videos {
+    my $video_id = get_selected_entry_code(type => 'video') // return;
+
+    my $results = $yv_obj->related_to_videoID($video_id);
+    if ($yv_utils->has_entries($results)) {
+        display_results($results);
+    }
+    else {
+        die "No related video for videoID: <$video_id>\n";
+    }
+}
+
+sub send_comment_to_video {
+    my $videoID = get_selected_entry_code(type => 'video') // return;
+    my $comment = get_text($gui->get_object('comment_textview'));
+
+    $feeds_statusbar->push(0,
+                           length($comment) && $yv_obj->comment_to_video_id($comment, $videoID)
+                           ? 'Video comment has been posted!'
+                           : 'Error!');
+}
+
+sub wrap_text {
+    my (%args) = @_;
+
+    require Text::Wrap;
+    local $Text::Wrap::columns = $CONFIG{comments_width};
+
+    my $text = "@{$args{text}}";
+    $text =~ tr{\r}{}d;
+
+    eval { Text::Wrap::wrap($args{i_tab}, $args{s_tab}, $text) } // $text;
+}
+
+sub display_comments {
+    my ($results) = @_;
+
+    return 1 if ref($results) ne 'HASH';
+
+    my $url          = $results->{url};
+    my $video_id     = $results->{results}{videoId};
+    my $comments     = $results->{results}{comments} // [];
+    my $continuation = $results->{results}{continuation};
+
+    foreach my $comment (@{$comments}) {
+
+        my $comment_id  = $yv_utils->get_comment_id($comment);
+        my $comment_age = $yv_utils->get_publication_age($comment);
+
+        if ($comment_age) {
+            if ($comment_age !~ / ago\b/) {
+                $comment_age = "$comment_age ago";
+            }
+        }
+        else {
+            $comment_age = $yv_utils->get_publication_date($comment) // 'unknown';
+        }
+
+        my $comment_text = reflow_text(
+                                      sprintf(
+                                              "<big><b>%s</b> (%s) commented:</big>\n%s",
+                                              encode_entities($yv_utils->get_author($comment)),
+                                              $comment_age,
+                                              encode_entities(
+                                                  wrap_text(
+                                                      i_tab => "\t",
+                                                      s_tab => "\t",
+                                                      text => [$yv_utils->get_comment_content($comment) // 'Empty comment...'],
+                                                  )
+                                              ),
+                                             )
+                                      );
+
+        if (not $comment->{_hidden}) {
+            my $iter = $feeds_liststore->append;
+            $feeds_liststore->set(
+                                  $iter,
+                                  0 => $comment_text,
+                                  3 => $video_id,
+                                  4 => $comment_id,
+                                 );
+        }
+
+        if (exists($comment->{replies}) and ref($comment->{replies}) eq 'ARRAY') {
+
+            foreach my $reply (@{$comment->{replies}}) {
+
+                my $reply_id  = $yv_utils->get_comment_id($reply);
+                my $reply_age = $yv_utils->get_publication_age($reply);
+
+                if ($reply_age) {
+                    $reply_age = "$reply_age ago";
+                }
+                else {
+                    $reply_age = $yv_utils->get_publication_date($reply) // 'unknown';
+                }
+
+                my $reply_text = reflow_text(
+                                          sprintf(
+                                                  "\t<big><b>%s</b> (%s) replied:</big>\n%s",
+                                                  encode_entities($yv_utils->get_author($reply)),
+                                                  $reply_age,
+                                                  encode_entities(
+                                                      wrap_text(
+                                                          i_tab => "\t\t",
+                                                          s_tab => "\t\t",
+                                                          text => [$yv_utils->get_comment_content($reply) // 'Empty reply...'],
+                                                      )
+                                                  ),
+                                                 )
+                                            );
+
+                my $iter = $feeds_liststore->append;
+                $feeds_liststore->set(
+                                      $iter,
+                                      0 => $reply_text,
+                                      3 => $video_id,
+                                      4 => $reply_id,
+                                     );
+            }
+        }
+    }
+
+    if (defined $continuation) {
+        my $iter = $feeds_liststore->append;
+        $feeds_liststore->set(
+                              $iter,
+                              0 => "<big><b>LOAD MORE</b></big>",
+                              1 => $url,
+                              2 => $continuation,
+                             );
+    }
+
+    return 1;
+}
+
+sub save_session {
+    $CONFIG{remember_session} || return;
+
+    my $curr        = $ResultsHistory{current};
+    my $curr_result = $ResultsHistory{results}[$curr] // return;
+
+    my @results = @{$ResultsHistory{results}};
+
+    require List::Util;
+
+    my $max   = $CONFIG{remember_session_depth};
+    my @left  = @results[List::Util::max(0, $curr - $max) .. $curr - 1];
+    my @right = @results[$curr + 1 .. List::Util::min($#results, $curr + $max)];
+
+    if ($yv_obj->get_debug) {
+        say "Session total: ", scalar(@results);
+        say "Session left : ", scalar(@left);
+        say "Session right: ", scalar(@right);
+    }
+
+    $ResultsHistory{current} = $#left + 1;
+    $ResultsHistory{results} = [@left, $curr_result, @right];
+
+    Storable::store(
+                    {
+                     keyword => $search_entry->get_text,
+                     history => \%ResultsHistory,
+                    },
+                    $session_file
+                   );
+}
+
+sub add_results_to_history {
+    my ($results) = @_;
+    my $results_copy = $results;
+    $ResultsHistory{current}++;
+    splice @{$ResultsHistory{results}}, $ResultsHistory{current}, 0, $results_copy;
+    set_prev_next_results_sensitivity();
+}
+
+sub display_previous_results {
+    if ($ResultsHistory{current} > 0) {
+        $ResultsHistory{current}--;
+        display_relative_results($ResultsHistory{current});
+    }
+}
+
+sub display_next_results {
+    if ($ResultsHistory{current} < $#{$ResultsHistory{results}}) {
+        $ResultsHistory{current}++;
+        display_relative_results($ResultsHistory{current});
+    }
+}
+
+sub display_relative_results {
+    my ($nth_item) = @_;
+    my $results_copy = $ResultsHistory{results}[$nth_item];
+    display_results($results_copy, 1);
+    set_prev_next_results_sensitivity();
+}
+
+sub set_prev_next_results_sensitivity {
+    $gui->get_object('show_prev_results')->set_sensitive($ResultsHistory{current} > 0);
+    $gui->get_object('show_next_results')->set_sensitive($ResultsHistory{current} < $#{$ResultsHistory{results}});
+}
+
+sub show_videos_from_selected_author {
+    uploads('channel', get_channel_id_for_selected_video() || return);
+}
+
+sub show_playlists_from_selected_author {
+    my $request = $yv_obj->playlists(get_channel_id_for_selected_video() || return);
+    if ($yv_utils->has_entries($request)) {
+        display_results($request);
+    }
+    else {
+        die "No playlists found...\n";
+    }
+    return 1;
+}
+
+sub set_entry_details {
+    my ($code, $iter, %opt) = @_;
+
+    my $type = $liststore->get($iter, 7);
+    my $info = $yv_obj->parse_json_string($liststore->get($iter, 8));
+
+    # Setting title
+    my $title = $yv_utils->get_title($info);
+
+    if ($type eq 'channel' or $type eq 'subscription') {
+        $title = $yv_utils->get_channel_title($info);
+    }
+
+    $title = encode_entities($title);
+
+    $gui->get_object('video_title_label')->set_label("<big><big><b>$title</b></big></big>");
+    $gui->get_object('video_title_label')->set_tooltip_markup("<b>$title</b>");
+
+    my $text_info;
+
+    if ($type eq 'video') {
+
+        #~ if ($opt{extra_info}) {
+        #~ my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($info));
+
+        #~ foreach my $key (keys %$extra_info) {
+        #~ $info->{$key} = $extra_info->{$key};
+        #~ }
+        #~ }
+
+        my $likes    = $yv_utils->get_likes($info);
+        my $dislikes = $yv_utils->get_dislikes($info);
+        my $views    = $yv_utils->get_views($info);
+
+        $text_info = join(
+                          "\n",
+                          map    { sprintf("%s  %s", $_->[0], $_->[1]) }
+                            grep { $_->[1] !~ /^(0|unknown)\z/i }
+                            grep { defined($_->[1]) } (
+                                                       [$symbols{author}      => $yv_utils->get_channel_title($info)],
+                                                       [$symbols{category}    => $yv_utils->get_category_name($info)],
+                                                       [$symbols{thumbs_up}   => $yv_utils->set_thousands($likes)],
+                                                       [$symbols{thumbs_down} => $yv_utils->set_thousands($dislikes)],
+                                                       [$symbols{average}     => $yv_utils->get_rating($info)],
+                                                       [$symbols{play}        => $yv_utils->get_time($info)],
+                                                       [$symbols{views}       => $yv_utils->set_thousands($views)],
+                                                       [$symbols{published}   => $yv_utils->get_publication_date($info)],
+                                                       [$symbols{author_id}   => $yv_utils->get_channel_id($info)],
+                                                      )
+                         );
+
+        $text_info .= "\n";
+    }
+    elsif ($type eq 'playlist') {
+
+        my $details_format = <<"EOT";
+‎$symbols{author}\t%s
+‎$symbols{video}\t%s videos
+$symbols{author_id}\t%s
+$symbols{play}\t%s
+EOT
+
+        $text_info = sprintf($details_format,
+                             $yv_utils->get_channel_title($info) // 'unknown',
+                             $yv_utils->set_thousands($yv_utils->get_playlist_video_count($info) // 0),
+                             $yv_utils->get_channel_id($info)  // 'unknown',
+                             $yv_utils->get_playlist_id($info) // 'unknown',
+                            );
+    }
+    elsif ($type eq 'channel' or $type eq 'subscription') {
+
+        my $details_format = <<"EOT";
+‎$symbols{author}\t%s
+‎$symbols{video}\t%s videos
+‎$symbols{subs}\t%s subscribers
+$symbols{author_id}\t%s
+EOT
+
+        $text_info = sprintf($details_format,
+                             $yv_utils->get_channel_title($info) // 'unknown',
+                             $yv_utils->short_human_number($yv_utils->get_video_count($info)      // 0),
+                             $yv_utils->short_human_number($yv_utils->get_subscriber_count($info) // 0),
+                             $yv_utils->get_channel_id($info) // 'unknown',
+                            );
+    }
+
+    $gui->get_object('video_details_label')->set_label("<big>" . encode_entities("\n" . $text_info) . "</big>");
+
+    # Setting the link button
+    my $url        = make_youtube_url($type, $code);
+    my $linkbutton = $gui->get_object('linkbutton1');
+
+    $linkbutton->set_label("Open video in browser");
+    $linkbutton->set_uri($url);
+
+    my %thumbs = (
+                  start  => 1,
+                  middle => 2,
+                  end    => 3,
+                 );
+
+    # Getting thumbs
+    foreach my $nr (keys %thumbs) {
+
+        $gui->get_object("image$thumbs{$nr}")->set_from_pixbuf($default_thumb);
+
+        Glib::Idle->add(
+            sub {
+                my ($nr) = @{$_[0]};
+
+                my $url = $yv_utils->get_thumbnail_url($info, $nr);
+
+                #~ my $thumbnail = $info->{snippet}{thumbnails}{medium};
+                #~ my $url       = $thumbnail->{url};
+
+                if ($url =~ /_live\.\w+\z/) {
+                    ## no extra thumbnails available while video is LIVE
+                }
+                else {
+                    ## FIXME: are there other thumbanils?
+                    #$url =~ s{/\d+:(\w+)\z}{/$thumbs{$nr}.$1};
+                }
+
+                my ($size_x, $size_y) = (160, 90);
+
+                if ($type eq 'subscription' or $type eq 'channel') {
+                    ($size_x, $size_y) = (120, 120);
+                }
+
+                my $pixbuf = get_pixbuf_thumbnail_from_url($url, $size_x, $size_y);
+                $gui->get_object("image$thumbs{$nr}")->set_from_pixbuf($pixbuf);
+
+                return 0;
+            },
+            [$nr],
+            Glib::G_PRIORITY_LOW
+        );
+    }
+
+    # Setting textview description
+    set_text($gui->get_object('description_textview'), $yv_utils->get_description($info));
+
+    if ($type eq 'video' and not $opt{extra_info}) {
+        Glib::Idle->add(sub { set_entry_details($code, $iter, extra_info => 1); return 0 }, [], Glib::G_PRIORITY_LOW);
+    }
+
+    return 1;
+}
+
+sub on_mainw_destroy {
+
+    # Save hpaned position
+    $CONFIG{hpaned_position} = $hbox2->get_position;
+
+    get_main_window_size();
+    dump_configuration();
+    save_usernames_to_file();
+    save_session();
+
+    'Gtk3'->main_quit;
+}
+
+$notebook->set_current_page($CONFIG{default_notebook_page});
+
+if ($CONFIG{remember_session} and -f $session_file) {
+
+    my $session = eval { Storable::retrieve($session_file) };
+
+    if (ref($session) eq 'HASH') {
+        %ResultsHistory = %{$session->{history}};
+        $search_entry->set_text($session->{keyword});
+        $search_entry->set_position(length($session->{keyword}));
+        $search_entry->select_region(0, -1);
+
+        if (not @ARGV) {
+            Glib::Idle->add(
+                sub {
+                    display_relative_results($ResultsHistory{current});
+                    return 0;
+                },
+                [],
+                Glib::G_PRIORITY_LOW
+            );
+        }
+    }
+    else {
+        warn "[!] Failed to load previous session...\n";
+        warn "[!] Reason: $@\n" if $@;
+    }
+}
+
+if (@ARGV) {
+    my $text = join(' ', @ARGV);
+    $search_entry->set_text($text);
+    $search_entry->set_position(length($text));
+    Glib::Idle->add(sub { search(); return 0 }, [], Glib::G_PRIORITY_LOW);
+}
+
+'Gtk3'->main;

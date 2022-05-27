@@ -59,7 +59,7 @@ sub _make_search_url {
         (@features ? (features => join(',', @features)) : ()),
 
         %opts,
-                                );
+    );
 }
 
 =head2 search_for($types,$keywords;\%args)
@@ -100,16 +100,7 @@ sub search_for {
         return $results;
     }
 
-    if (my $results = $self->yt_search(q => $keywords, type => $type, %$args)) {
-        return $results;
-    }
-
-    my $url = $self->_make_search_url(
-                                      type => $type,
-                                      q    => $keywords,
-                                      %$args
-                                     );
-    return $self->_get_results($url);
+    return {};
 }
 
 {
@@ -256,14 +247,8 @@ sub related_to_videoID {
             premium         => 0,
 
             videoThumbnails => [
-                map {
-                    scalar {
-                            quality => 'medium',
-                            url     => $_->{url},
-                            width   => $_->{width},
-                            height  => $_->{height},
-                           }
-                } @{$info->{thumbnail}{thumbnails}}
+                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
+                            @{$info->{thumbnail}{thumbnails}}
             ],
         };
     }

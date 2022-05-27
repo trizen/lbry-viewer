@@ -45,7 +45,7 @@ sub new {
 
     my $self = bless {
                       thousand_separator => q{,},
-                      lbry_url_format => 'https://open.lbry.com/%s',
+                      lbry_url_format    => 'https://open.lbry.com/%s',
                      }, $class;
 
     $self->{months} = [
@@ -408,8 +408,7 @@ sub format_text {
          : ()
         ),
 
-        #URL => sub { sprintf($self->{youtube_url_format}, $self->get_video_id($info)) },
-        URL => sub { sprintf($self->{lbry_url_format}, $self->get_video_id($info)) },
+        URL => sub { $info->{url} // sprintf($self->{lbry_url_format}, $self->get_video_id($info)) },
     );
 
     my $tokens_re = do {

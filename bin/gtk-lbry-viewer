@@ -3457,6 +3457,8 @@ sub get_player_command {
 
     my $has_video = $cmd =~ /(?:^|\s)\*(?:VIDEO|URL)\*(?:\s|\z)/;
 
+    my $video_id = $yv_utils->get_video_id($video);
+
     $cmd = $yv_utils->format_text(
                                   streaming => undef,
                                   info      => $video,
@@ -3464,7 +3466,7 @@ sub get_player_command {
                                   escape    => 1,
                                  );
 
-    $has_video ? $cmd : join(' ', $cmd, sprintf($CONFIG{lbry_video_url}, $yv_utils->get_video_id($video)));
+    $has_video ? $cmd : join(' ', $cmd, quotemeta(sprintf($CONFIG{lbry_video_url}, $video_id)));
 }
 
 sub prepend_video_data_to_file {

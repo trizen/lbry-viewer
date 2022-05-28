@@ -5,6 +5,13 @@
 
 [CHANGELOG]
 
+Version 0.0.2
+
+- Added support for changing resolution.
+- Added support for changing the Librarian instance.
+- Better parsing of LBRY/Odysee URLs.
+- Several bug-fixes and improvements.
+
 Version 0.0.1
 
 - First release.

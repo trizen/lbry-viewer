@@ -4,7 +4,7 @@ A lightweight application (fork of [pipe-viewer](https://github.com/trizen/pipe-
 
 ### STATUS
 
-The application is in the early stages of development. Some functionality not implemented yet.
+The application is in the early stages of development. Some functionality is not implemented yet.
 
 ### lbry-viewer
 

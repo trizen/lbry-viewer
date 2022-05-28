@@ -30,12 +30,7 @@ sub videos_from_channel_id {
         return $results;
     }
 
-    if (my $results = $self->yt_channel_uploads($channel_id)) {
-        return $results;
-    }
-
-    my $url = $self->_make_feed_url("channels/$channel_id/videos");
-    return $self->_get_results($url);
+    return;
 }
 
 sub videos_from_username {

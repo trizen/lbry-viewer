@@ -16,7 +16,7 @@ memoize('_ytdl_is_available');
 
 memoize('_info_from_ytdl');
 
-#memoize('_extract_from_ytdl');
+memoize('_extract_from_ytdl');
 memoize('_extract_from_invidious');
 
 use parent qw(
@@ -432,13 +432,6 @@ sub lwp_get {
         $url = 'https:' . $url;
     }
 
-    if ($url =~ m{^/vi/}) {
-        $url = 'https://i.ytimg.com' . $url;
-    }
-
-    # Fix YouTube thumbnails for results from invidious instances
-    $url =~ s{^https?://[^/]+(/vi/.*\.jpg)\z}{https://i.ytimg.com$1};
-
     my %lwp_header = ($opt{simple} ? () : $self->_auth_lwp_header);
 
     my $response = do {
@@ -475,9 +468,9 @@ sub lwp_get {
         return $self->lwp_get($url, %opt, depth => $opt{depth} + 1);
     }
 
-    # Too many errors. Pick another invidious instance.
+    # Too many errors. Pick another Librarian instance.
     if ($url !~ m{(?:\byoutube\.com/|\bi\.ytimg\.com/)}) {
-        $self->pick_and_set_random_instance();
+        ## TODO
     }
 
     _warn_reponse_error($response, $url);
@@ -677,6 +670,8 @@ sub pick_random_instance {
 sub pick_and_set_random_instance {
     my ($self) = @_;
 
+    return;    # TODO: implement it
+
     my $instance = $self->pick_random_instance() // return;
 
     ref($instance) eq 'ARRAY' or return;
@@ -767,6 +762,8 @@ sub _make_feed_url {
 
 sub _extract_from_invidious {
     my ($self, $videoID) = @_;
+
+    return;    # invalid
 
     my @candidates       = $self->select_good_invidious_instances();
     my @extra_candidates = $self->select_good_invidious_instances(lax => 1);
@@ -886,6 +883,15 @@ sub _extract_from_ytdl {
         }
     }
 
+    if (!@formats and defined($ref->{url})) {
+        push @formats,
+          scalar {
+                  itag => 'hls-176',
+                  type => 'video/mp4',
+                  url  => $ref->{url},
+                 };
+    }
+
     return @formats;
 }
 
@@ -911,18 +917,6 @@ sub _fallback_extract_urls {
         }
 
         @formats && return @formats;
-    }
-
-    # Use the API of invidious
-    if ($self->get_debug) {
-        say STDERR ":: Using invidious to extract the streaming URLs...";
-    }
-
-    push @formats, $self->_extract_from_invidious($videoID);
-
-    if ($self->get_debug) {
-        my $count = scalar(@formats);
-        say STDERR ":: invidious: found $count streaming URLs...";
     }
 
     return @formats;
@@ -1165,12 +1159,13 @@ sub _make_translated_captions {
 sub _fallback_extract_captions {
     my ($self, $videoID) = @_;
 
+    return;    # TODO: implement it (do LBRY videos have CC?)
+
     if ($self->get_debug) {
         my $cmd = $self->get_ytdl_cmd;
         say STDERR ":: Extracting closed-caption URLs with $cmd";
     }
 
-    # Extract closed-caption URLs with yt-dlp / youtube-dl if our code failed
     my $ytdl_info = $self->_info_from_ytdl($videoID);
 
     my @caption_urls;
@@ -1231,89 +1226,11 @@ Returns a list of streaming URLs for a videoID.
 sub get_streaming_urls {
     my ($self, $videoID) = @_;
 
-    no warnings 'redefine';
-
-    local *_get_video_info    = memoize(\&_get_video_info);
-    local *_info_from_ytdl    = memoize(\&_info_from_ytdl);
-    local *_extract_from_ytdl = memoize(\&_extract_from_ytdl);
-
-    my %info = $self->_get_video_info($videoID);
-    my $json = defined($info{player_response}) ? $self->parse_json_string($info{player_response}) : {};
-
     my @caption_urls;
+    my @streaming_urls = $self->_fallback_extract_urls($videoID);
 
-    if (not defined $json->{streamingData}) {
-        say STDERR ":: Trying to bypass age-restricted gate..." if $self->get_debug;
-
-        my @fallback_methods = (
-            sub {
-                %info =
-                  $self->_get_video_info(
-                                         $videoID,
-                                         "clientName"    => "TVHTML5_SIMPLY_EMBEDDED_PLAYER",
-                                         "clientVersion" => "2.0"
-                                        );
-              },
-        );
-
-        if ($self->get_bypass_age_gate_with_proxy) {
-
-            # See:
-            #   https://github.com/zerodytrash/Simple-YouTube-Age-Restriction-Bypass/tree/main/account-proxy
-
-            push @fallback_methods, sub {
-
-                my $proxy_url = "https://youtube-proxy.zerody.one/getPlayer?";
-
-                $proxy_url .= $self->list_to_url_arguments(
-                                                           videoId       => $videoID,
-                                                           reason        => "LOGIN_REQUIRED",
-                                                           clientName    => "ANDROID",
-                                                           clientVersion => "16.20",
-                                                           hl            => "en",
-                                                          );
-
-                %info = (player_response => $self->lwp_get($proxy_url, simple => 1));
-            };
-        }
-
-        # Try to find a fallback method that works
-        foreach my $fallback_method (@fallback_methods) {
-            $fallback_method->();
-            $json = defined($info{player_response}) ? $self->parse_json_string($info{player_response}) : {};
-            if (defined($json->{streamingData})) {
-                push @caption_urls, $self->_fallback_extract_captions($videoID);
-                last;
-            }
-        }
-    }
-
-    my @streaming_urls = $self->_extract_streaming_urls($json, $videoID);
-
-    if (eval { ref($json->{captions}{playerCaptionsTracklistRenderer}{captionTracks}) eq 'ARRAY' }) {
-
-        my @caption_tracks = @{$json->{captions}{playerCaptionsTracklistRenderer}{captionTracks}};
-        my @human_made_cc  = grep { ($_->{kind} // '') ne 'asr' } @caption_tracks;
-
-        push @caption_urls, @human_made_cc, @caption_tracks;
-
-        foreach my $caption (@caption_urls) {
-            $caption->{baseUrl} =~ s{\bfmt=srv[0-9]\b}{fmt=srv1}g;
-        }
-
-        push @caption_urls, $self->_make_translated_captions(\@caption_urls);
-    }
-
-    # Try again with youtube-dl / invidious
-    if (   !@streaming_urls
-        or (($json->{playabilityStatus}{status} // '') =~ /fail|error|unavailable|not available/i)
-        or $self->get_force_fallback) {
-
-        @streaming_urls = $self->_fallback_extract_urls($videoID);
-
-        if (!@caption_urls) {
-            push @caption_urls, $self->_fallback_extract_captions($videoID);
-        }
+    if (!@caption_urls) {
+        push @caption_urls, $self->_fallback_extract_captions($videoID);
     }
 
     if ($self->get_debug) {
@@ -1321,65 +1238,23 @@ sub get_streaming_urls {
         say STDERR ":: Found $count streaming URLs...";
     }
 
-    if ($self->get_prefer_mp4 or $self->get_prefer_av1) {
-
-        my @video_urls;
-        my @audio_urls;
-
-        require WWW::LbryViewer::Itags;
-        state $itags = WWW::LbryViewer::Itags::get_itags();
-
-        my %audio_itags;
-        @audio_itags{map { $_->{value} } @{$itags->{audio}}} = ();
-
-        foreach my $url (@streaming_urls) {
-
-            if (exists($audio_itags{$url->{itag}})) {
-                push @audio_urls, $url;
-                next;
-            }
-
-            if ($url->{type} =~ /\bvideo\b/i) {
-                if ($url->{type} =~ /\bav[0-9]+\b/i) {    # AV1
-                    if ($self->get_prefer_av1) {
-                        push @video_urls, $url;
-                    }
-                }
-                elsif ($self->get_prefer_mp4 and $url->{type} =~ /\bmp4\b/i) {
-                    push @video_urls, $url;
-                }
-            }
-            else {
-                push @audio_urls, $url;
-            }
-        }
-
-        if (@video_urls) {
-            @streaming_urls = (@video_urls, @audio_urls);
-        }
-    }
-
-    # Filter out streams with `clen = 0`.
-    @streaming_urls = grep { defined($_->{clen}) ? ($_->{clen} > 0) : 1 } @streaming_urls;
-
-    # Return the YouTube URL when there are no streaming URLs
+    # Return the LBRY URL when there are no streaming URLs
     if (!@streaming_urls) {
         push @streaming_urls,
           {
-            itag => 38,
+            itag => 'hls-176',
             type => "video/mp4",
-            url  => "https://www.youtube.com/watch?v=$videoID",
+            url  => "https://open.lbry.com/$videoID",
           };
     }
 
     if ($self->get_debug >= 2) {
         require Data::Dump;
-        Data::Dump::pp(\%info) if ($self->get_debug >= 3);
         Data::Dump::pp(\@streaming_urls);
         Data::Dump::pp(\@caption_urls);
     }
 
-    return (\@streaming_urls, \@caption_urls, \%info);
+    return (\@streaming_urls, \@caption_urls);
 }
 
 sub _request {

@@ -3543,7 +3543,7 @@ sub save_watched_video {
 }
 
 sub get_player_command {
-    my ($video) = @_;
+    my ($streaming, $video) = @_;
 
     my %player_args = (%PLAYER_ARGS);
     my $player      = $opt{video_players}{$opt{video_player_selected}};
@@ -3562,6 +3562,18 @@ sub get_player_command {
             # Video player
             $player->{cmd},
 
+            (    # Audio file (https://)
+              (ref($streaming->{streaming}{__AUDIO__}) eq 'HASH' && defined($player->{audio}))
+              ? $player->{audio}
+              : ()
+            ),
+
+            (    # Subtitle file (.srt)
+              (defined($streaming->{srt_file}) && defined($player->{srt}))
+              ? $player->{srt}
+              : ()
+            ),
+
             # Rest of the arguments
             (grep { defined($_) and /\S/ } values %player_args)
         )
@@ -3569,16 +3581,18 @@ sub get_player_command {
 
     my $has_video = $cmd =~ /(?:^|\s)\*(?:VIDEO|URL)\*(?:\s|\z)/;
 
-    my $video_id = $yv_utils->get_video_id($video);
-
     $cmd = $yv_utils->format_text(
-                                  streaming => undef,
+                                  streaming => $streaming,
                                   info      => $video,
                                   text      => $cmd,
                                   escape    => 1,
                                  );
 
-    $has_video ? $cmd : join(' ', $cmd, quotemeta(sprintf($opt{lbry_video_url}, $video_id)));
+    #~ if ($streaming->{streaming}{url} =~ m{^https://www\.youtube\.com/watch\?v=}) {
+    #~ $cmd =~ s{\s*--no-ytdl\b}{ }g;
+    #~ }
+
+    $has_video ? $cmd : join(' ', $cmd, quotemeta($streaming->{streaming}{url}));
 }
 
 sub autoplay {
@@ -3632,6 +3646,13 @@ sub play_videos {
             next if $yv_utils->get_duration($video) < $opt{min_seconds};
         }
 
+        my $streaming = get_streaming_url($video_id);
+
+        if (ref($streaming->{streaming}) ne 'HASH') {
+            warn colored("[!] No streaming URL has been found...", 'bold red') . "\n";
+            next;
+        }
+
         if ($opt{download_video}) {
             print_video_info($video);
             if (not download_video($video)) {
@@ -3651,7 +3672,7 @@ sub play_videos {
         }
         else {
             print_video_info($video);
-            my $command = get_player_command($video);
+            my $command = get_player_command($streaming, $video);
 
             if ($yv_obj->get_debug) {
                 say "-> Command: $command";
@@ -3805,6 +3826,11 @@ sub print_video_info {
     my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($video) // return 1);
 
     foreach my $key (keys %$extra_info) {
+
+        if ($key eq 'videoThumbnails') {
+            next if defined($video->{$key});
+        }
+
         $video->{$key} = $extra_info->{$key} if defined($extra_info->{$key});
     }
 

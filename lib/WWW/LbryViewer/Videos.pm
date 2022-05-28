@@ -182,10 +182,10 @@ sub _fallback_video_details {
             title   => $info->{fulltitle} // $info->{title},
             videoId => $id,
 
-            #~ videoThumbnails => [
-            #~ map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
-            #~ @{$info->{thumbnails}}
-            #~ ],
+            videoThumbnails => [
+                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
+                            @{$info->{thumbnails}}
+            ],
 
             liveNow       => ($info->{is_live} ? 1 : 0),
             description   => $info->{description},
@@ -200,8 +200,10 @@ sub _fallback_video_details {
             keywords  => $info->{tags},
             viewCount => $info->{view_count},
 
-            author   => $info->{channel},
-            authorId => (split(/\//, $id))[0],
+            author => $info->{channel},
+
+            #authorId => (split(/\//, $id))[0],
+            authorId => (split(/\//, $info->{channel_url}))[-1],
             rating   => $info->{average_rating},
         };
     }

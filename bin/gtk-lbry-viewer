@@ -3432,7 +3432,7 @@ sub get_quotewords {
 
 #---------------------- PLAY AN YOUTUBE VIDEO ----------------------#
 sub get_player_command {
-    my ($video) = @_;
+    my ($streaming, $video) = @_;
 
     my %player_args;
     my $player = $CONFIG{video_players}{$CONFIG{video_player_selected}};
@@ -3450,6 +3450,18 @@ sub get_player_command {
             # Video player
             $player->{cmd},
 
+            (    # Audio file (https://)
+              (ref($streaming->{streaming}{__AUDIO__}) eq 'HASH' && defined($player->{audio}))
+              ? $player->{audio}
+              : ()
+            ),
+
+            (    # Caption file (.srt)
+              (defined($streaming->{srt_file}) && defined($player->{srt}))
+              ? $player->{srt}
+              : ()
+            ),
+
             # Rest of the arguments
             (grep { defined($_) and /\S/ } values %player_args)
         )
@@ -3457,16 +3469,18 @@ sub get_player_command {
 
     my $has_video = $cmd =~ /(?:^|\s)\*(?:VIDEO|URL)\*(?:\s|\z)/;
 
-    my $video_id = $yv_utils->get_video_id($video);
-
     $cmd = $yv_utils->format_text(
-                                  streaming => undef,
+                                  streaming => $streaming,
                                   info      => $video,
                                   text      => $cmd,
                                   escape    => 1,
                                  );
 
-    $has_video ? $cmd : join(' ', $cmd, quotemeta(sprintf($CONFIG{lbry_video_url}, $video_id)));
+    #~ if ($streaming->{streaming}{url} =~ m{^https://www\.youtube\.com/watch\?v=}) {
+    #~ $cmd =~ s{\s*--no-ytdl\b}{ }g;
+    #~ }
+
+    $has_video ? $cmd : join(' ', $cmd, quotemeta($streaming->{streaming}{url}));
 }
 
 sub prepend_video_data_to_file {
@@ -3527,8 +3541,22 @@ sub save_watched_video {
 sub play_video {
     my ($video) = @_;
 
-    my $video_id = $yv_utils->get_video_id($video);
-    my $command  = get_player_command($video);
+    my $video_id  = $yv_utils->get_video_id($video);
+    my $streaming = get_streaming_url($video_id);
+
+    if (ref($streaming->{streaming}) ne 'HASH') {
+        die "[!] Can't play this video: no streaming URL has been found!\n";
+    }
+
+    my $command = get_player_command($streaming, $video);
+
+    if ($yv_obj->get_debug) {
+        say "-> Resolution: $streaming->{resolution}";
+        say "-> Video itag: $streaming->{streaming}{itag}";
+        say "-> Audio itag: $streaming->{streaming}{__AUDIO__}{itag}" if exists $streaming->{streaming}{__AUDIO__};
+        say "-> Video type: $streaming->{streaming}{type}";
+        say "-> Audio type: $streaming->{streaming}{__AUDIO__}{type}" if exists $streaming->{streaming}{__AUDIO__};
+    }
 
     my $code = execute_external_program($command);
 
@@ -3995,6 +4023,11 @@ sub set_entry_details {
         if ($opt{extra_info}) {
             my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($info));
             foreach my $key (keys %$extra_info) {
+
+                if ($key eq 'videoThumbnails') {
+                    next if defined($info->{$key});
+                }
+
                 $info->{$key} = $extra_info->{$key} if defined($extra_info->{$key});
             }
         }
@@ -4017,7 +4050,8 @@ sub set_entry_details {
                 [$symbols{play}      => $yv_utils->get_time($info)],
                 [$symbols{views}     => $yv_utils->set_thousands($views)],
                 [$symbols{published} => $yv_utils->get_publication_date($info)],
-                [$symbols{author_id} => $yv_utils->get_channel_id($info)],
+
+                # [$symbols{author_id} => $yv_utils->get_channel_id($info)],
               )
         );
 

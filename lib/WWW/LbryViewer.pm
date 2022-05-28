@@ -11,13 +11,9 @@ tie my %youtubei_cache => 'Memoize::Expire',
   LIFETIME             => 600,                 # in seconds
   NUM_USES             => 10;
 
-#memoize('_get_video_info');
 memoize('_ytdl_is_available');
-
 memoize('_info_from_ytdl');
-
 memoize('_extract_from_ytdl');
-memoize('_extract_from_invidious');
 
 use parent qw(
   WWW::LbryViewer::Librarian
@@ -572,75 +568,34 @@ sub get_invidious_instances {
     $self->parse_json_string($json_string);
 }
 
-sub select_good_invidious_instances {
+sub get_librarian_instances {
     my ($self, %args) = @_;
 
-    state $instances = $self->get_invidious_instances;
+    my @instances = qw(
+      lbry.bcow.xyz
+      librarian.pussthecat.org
+      lbry.mutahar.rocks
+      librarian.esmailelbob.xyz
+      lbry.vern.cc
+    );
 
-    ref($instances) eq 'ARRAY' or return;
-
-    my %ignored = (
-        'yewtu.be'                 => 1,    # 403 Forbidden (API)
-        'invidious.tube'           => 1,    # down?
-        'invidiou.site'            => 0,
-        'invidious.site'           => 1,    # AGPL Violation + trackers
-        'invidious.zee.li'         => 1,    # uses Cloudflare // 500 read timeout
-        'invidious.048596.xyz'     => 1,    # broken API
-        'invidious.xyz'            => 1,    # 502 Bad Gateway
-        'vid.mint.lgbt'            => 0,
-        'invidious.ggc-project.de' => 1,    # broken API
-        'invidious.toot.koeln'     => 1,    # broken API
-        'invidious.kavin.rocks'    => 1,    # 403 Forbidden (API)
-        'invidious.snopyta.org'    => 0,
-        'invidious.silkky.cloud'   => 0,
-        'invidious.moomoo.me'      => 1,    # uses Cloudflare
-        'y.com.cm'                 => 1,    # uses Cloudflare
-        'invidious.exonip.de'      => 1,    # 403 Forbidden (API)
-        'invidious-us.kavin.rocks' => 1,    # 403 Forbidden (API)
-        'invidious-jp.kavin.rocks' => 1,    # 403 Forbidden (API)
-                  );
-
-#<<<
-    my @candidates =
-      grep { not $ignored{$_->[0]} }
-      grep { $args{lax} ? 1 : eval { lc($_->[1]{monitor}{dailyRatios}[0]{label} // '') eq 'success' } }
-      #~ grep { $args{lax} ? 1 : eval { lc($_->[1]{monitor}{weeklyRatio}{label} // '') eq 'success' } }
-      grep { $args{lax} ? 1 : eval { lc($_->[1]{monitor}{statusClass} // '') eq 'success' } }
-      #~ grep { $args{lax} ? 1 : !exists($_->[1]{stats}{error}) }
-      grep { lc($_->[1]{type} // '') eq 'https' } @$instances;
-#>>>
-
-    if ($self->get_debug) {
-
-        my @hosts = map { $_->[0] } @candidates;
-        my $count = scalar(@candidates);
-
-        print STDERR ":: Found $count invidious instances: @hosts\n";
-    }
-
-    return @candidates;
+    return @instances;
 }
 
 sub _find_working_instance {
-    my ($self, $candidates, $extra_candidates) = @_;
+    my ($self, $candidates) = @_;
 
     require List::Util;
     state $yv_utils = WWW::LbryViewer::Utils->new();
 
-    foreach my $instance (List::Util::shuffle(@$candidates), List::Util::shuffle(@$extra_candidates)) {
+    foreach my $instance (List::Util::shuffle(@$candidates)) {
 
-        ref($instance) eq 'ARRAY' or next;
-
-        my $uri = $instance->[1]{uri} // next;
-        $uri =~ s{/+\z}{};    # remove trailing '/'
-
-        local $self->{api_host}         = $uri;
-        local $self->{prefer_invidious} = 1;
-
+        my $uri = "https://$instance";
+        local $self->{api_host} = $uri;
         my $results = $self->search_videos('test');
 
         if ($yv_utils->has_entries($results)) {
-            return $instance;
+            return $uri;
         }
     }
 
@@ -650,17 +605,10 @@ sub _find_working_instance {
 sub pick_random_instance {
     my ($self) = @_;
 
-    my @candidates       = $self->select_good_invidious_instances();
-    my @extra_candidates = $self->select_good_invidious_instances(lax => 1);
+    my @candidates = $self->get_librarian_instances();
 
-    if ($self->get_prefer_invidious) {
-        if (defined(my $instance = $self->_find_working_instance(\@candidates, \@extra_candidates))) {
-            return $instance;
-        }
-    }
-
-    if (not @candidates) {
-        @candidates = @extra_candidates;
+    if (defined(my $instance = $self->_find_working_instance(\@candidates))) {
+        return $instance;
     }
 
     $candidates[rand @candidates];
@@ -669,24 +617,20 @@ sub pick_random_instance {
 sub pick_and_set_random_instance {
     my ($self) = @_;
 
-    #return "lbry.bcow.xyz";
+    # For now, pick the official one, as it is more likely to work
+    return $self->set_api_host("https://lbry.bcow.xyz");
 
-    my @list = qw(
-        lbry.bcow.xyz
-        librarian.pussthecat.org
-        lbry.mutahar.rocks
-        librarian.esmailelbob.xyz
-        lbry.vern.cc
-    );
+    # Get the list of invidious instances
+    # my @instances = $self->get_librarian_instances();
 
     # Select a random instance
-    #my $instance = $list[rand @list];
+    #my $instance = $instances[rand @instances];
 
-    # For now, pick the first one, as it is the official one == more likely to work
-    my $instance = $list[0];
+    #my $instance = $instances[0];
+    my $instance = $self->pick_random_instance();
 
     # Set the instance
-    $self->set_api_host("https://$instance");
+    $self->set_api_host($instance);
 }
 
 sub get_librarian_url {
@@ -765,78 +709,6 @@ sub _make_feed_url {
     }
 
     return $url;
-}
-
-sub _extract_from_invidious {
-    my ($self, $videoID) = @_;
-
-    return;    # invalid
-
-    my @candidates       = $self->select_good_invidious_instances();
-    my @extra_candidates = $self->select_good_invidious_instances(lax => 1);
-
-    require List::Util;
-
-#<<<
-    my %seen;
-    my @instances = grep { !$seen{$_}++ } (
-        List::Util::shuffle(map { $_->[0] } @candidates),
-        List::Util::shuffle(map { $_->[0] } @extra_candidates),
-    );
-#>>>
-
-    if (@instances) {
-        push @instances, 'invidious.snopyta.org';
-    }
-    else {
-        @instances = qw(
-          invidious.snopyta.org
-          invidious.fdn.fr
-          invidious.namazso.eu
-          vid.puffyan.us
-          invidious.flokinet.to
-        );
-    }
-
-    if ($self->get_debug) {
-        print STDERR ":: Invidious instances: @instances\n";
-    }
-
-    # Restrict the number of invidious instances to the first 5.
-    # If the first 5 instances fail, most likely all will fail.
-    if (scalar(@instances) > 5) {
-        $#instances = 4;
-    }
-
-    my $tries      = 2 * scalar(@instances);
-    my $instance   = shift(@instances);
-    my $url_format = "https://%s/api/v1/videos/%s?fields=formatStreams,adaptiveFormats";
-    my $url        = sprintf($url_format, $instance, $videoID);
-
-    my $resp = $self->{lwp}->get($url);
-
-    while (not $resp->is_success() and --$tries >= 0) {
-        $url  = sprintf($url_format, shift(@instances), $videoID) if (@instances and ($tries % 2 == 0));
-        $resp = $self->{lwp}->get($url);
-    }
-
-    $resp->is_success() || return;
-
-    my $json = $resp->decoded_content()        // return;
-    my $ref  = $self->parse_json_string($json) // return;
-
-    my @formats;
-
-    # The entries are already in the format that we want.
-    if (exists($ref->{adaptiveFormats}) and ref($ref->{adaptiveFormats}) eq 'ARRAY') {
-        push @formats, @{$ref->{adaptiveFormats}};
-    }
-
-    if (exists($ref->{formatStreams}) and ref($ref->{formatStreams}) eq 'ARRAY') {
-        push @formats, @{$ref->{formatStreams}};
-    }
-
-    return @formats;
 }
 
 sub _ytdl_is_available {

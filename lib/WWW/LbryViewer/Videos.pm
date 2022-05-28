@@ -179,8 +179,9 @@ sub _fallback_video_details {
     if (defined($info) and ref($info) eq 'HASH') {
         return scalar {
 
-            title   => $info->{fulltitle} // $info->{title},
-            videoId => $id,
+            extra_info => 1,
+            title      => $info->{fulltitle} // $info->{title},
+            videoId    => $id,
 
             videoThumbnails => [
                           map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
@@ -222,6 +223,7 @@ sub video_details {
     }
 
     # TODO: extract video info from the Librarian website (it would be faster)
+    # return $self->lbry_video_info(id => $id);
 
     return $self->_fallback_video_details($id, $fields);
 

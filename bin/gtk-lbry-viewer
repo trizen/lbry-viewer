@@ -1243,7 +1243,7 @@ sub menu_popup {
             # Open the LBRY video page
             {
                 my $item = 'Gtk3::ImageMenuItem'->new("LBRY page");
-                $item->signal_connect(activate => sub { open_external_url(make_youtube_url('video', $video_id)) });
+                $item->signal_connect(activate => sub { open_external_url(make_lbry_url('video', $video_id)) });
                 $item->set_property(tooltip_text => "Open the LBRY page of this video");
                 $item->set_image('Gtk3::Image'->new_from_icon_name("applications-internet-symbolic", q{menu}));
                 $item->show;
@@ -1382,7 +1382,7 @@ sub menu_popup {
         # Open the LBRY channel page
         {
             my $item = 'Gtk3::ImageMenuItem'->new("LBRY page");
-            $item->signal_connect(activate => sub { open_external_url(make_youtube_url('channel', $channel_id)) });
+            $item->signal_connect(activate => sub { open_external_url(make_lbry_url('channel', $channel_id)) });
             $item->set_property(tooltip_text => "Open the LBRY page of this channel");
             $item->set_image('Gtk3::Image'->new_from_icon_name("applications-internet-symbolic", q{menu}));
             $item->show;
@@ -2915,116 +2915,36 @@ sub display_results {
         add_results_to_history($results) if not $from_history;
     }
 
-    #~ if (not $from_history) {
-
-    #~ foreach my $entry (@$items) {
-    #~ if ($yv_utils->is_activity($entry)) {
-    #~ my $type = $entry->{snippet}{type};
-
-    #~ if ($type eq 'upload') {
-    #~ $entry->{kind} = 'youtube#video';
-    #~ $entry->{id}   = $entry->{contentDetails}{upload}{videoId};
-    #~ }
-
-    #~ if ($type eq 'playlistItem') {
-    #~ $entry->{kind} = 'youtube#video';
-    #~ $entry->{id}   = $entry->{contentDetails}{playlistItem}{resourceId}{videoId};
-    #~ }
-
-    #~ if ($type eq 'subscription') {
-    #~ $entry->{kind}               = 'youtube#channel';
-    #~ $entry->{snippet}{title}     = $entry->{snippet}{channelTitle};
-    #~ $entry->{snippet}{channelId} = $entry->{contentDetails}{subscription}{resourceId}{channelId};
-    #~ }
-
-    #~ if ($type eq 'bulletin' and $entry->{contentDetails}{bulletin}{resourceId}{kind} eq 'youtube#video') {
-    #~ $entry->{kind} = 'youtube#video';
-    #~ $entry->{id}   = $entry->{contentDetails}{bulletin}{resourceId}{videoId};
-    #~ }
-    #~ }
-    #~ }
-
-    #~ my @video_ids;
-    #~ my @playlist_ids;
-
-    #~ foreach my $i (0 .. $#{$items}) {
-    #~ my $item = $items->[$i];
-
-    #~ if ($yv_utils->is_playlist($item)) {
-    #~ push @playlist_ids, $yv_utils->get_playlist_id($item);
-    #~ }
-    #~ elsif ($yv_utils->is_video($item)) {
-    #~ push @video_ids, $yv_utils->get_video_id($item);
-    #~ }
-    #~ }
-
-    #~ my %id_lookup;
-
-    #~ if (@video_ids) {
-    #~ my $content_details = $yv_obj->video_details(join(',', @video_ids), VIDEO_PART);
-    #~ my $video_details   = $content_details->{results}{items};
-
-    #~ foreach my $i (0 .. $#video_ids) {
-    #~ $id_lookup{$video_ids[$i]} = $video_details->[$i];
-    #~ }
-    #~ }
-
-    #~ if (@playlist_ids) {
-    #~ my $content_details  = $yv_obj->playlist_from_id(join(',', @playlist_ids), 'contentDetails');
-    #~ my $playlist_details = $content_details->{results}{items};
-
-    #~ foreach my $i (0 .. $#playlist_ids) {
-    #~ $id_lookup{$playlist_ids[$i]} = $playlist_details->[$i];
-    #~ }
-    #~ }
-
-    #~ $info->{__extra_info__} = \%id_lookup;
-    #~ }
+    my @rows;
 
     foreach my $i (0 .. $#{$items}) {
         my $item = $items->[$i];
 
         if ($yv_utils->is_playlist($item)) {
-
-            #~ my $playlist_id = $yv_utils->get_playlist_id($item) || next;
-
-            #~ if (exists($info->{__extra_info__}{$playlist_id})) {
-            #~ @{$item}{qw(contentDetails)} =
-            #~ @{$info->{__extra_info__}{$playlist_id}}{qw(contentDetails)};
-            #~ }
-
-            add_playlist_entry($item);
+            push @rows, add_playlist_entry($item);
         }
         elsif ($yv_utils->is_channel($item)) {
-            add_channel_entry($item);
+            push @rows, add_channel_entry($item);
         }
         elsif ($yv_utils->is_subscription($item)) {
-            add_subscription_entry($item);
+            push @rows, add_subscription_entry($item);
         }
         elsif ($yv_utils->is_video($item)) {
-
-            #~ my $video_id = $yv_utils->get_video_id($item) || next;
-
-            #~ if (exists($info->{__extra_info__}{$video_id})) {
-            #~ @{$item}{qw(id contentDetails statistics snippet)} =
-            #~ @{$info->{__extra_info__}{$video_id}}{qw(id contentDetails statistics snippet)};
-            #~ }
-
-            # Filter out private or deleted videos
-            #$yv_utils->get_video_id($item) || next;
-
-            # Filter out videos with time '00:00'
-            #$yv_utils->get_time($item) eq '00:00' and next;
-
-            # Mark as video
-            #$item->{__is_video__} = 1;
 
             # Store the video title to history (when `save_titles_to_history` is true)
             if ($CONFIG{save_titles_to_history}) {
                 append_to_history($yv_utils->get_title($item), 0);
             }
 
-            add_video_entry($item);
+            push @rows, add_video_entry($item);
+        }
+    }
+
+    # Would be nice if we could retrieve the thumbnails in parallel
+    if ($CONFIG{show_thumbs}) {
+        foreach my $row (@rows) {
+            my ($entry, $liststore, $iter) = @$row;
+            set_thumbnail($entry, $liststore, $iter);
         }
     }
 
@@ -3104,9 +3024,7 @@ sub add_subscription_entry {
                     8 => $yv_obj->make_json_string($subscription),
                    );
 
-    if ($CONFIG{show_thumbs}) {
-        set_thumbnail($subscription, $liststore, $iter);
-    }
+    return [$subscription, $liststore, $iter];
 }
 
 sub reflow_text {
@@ -3160,9 +3078,7 @@ sub add_video_entry {
                     8 => $yv_obj->make_json_string($video),
                    );
 
-    if ($CONFIG{show_thumbs}) {
-        set_thumbnail($video, $liststore, $iter);
-    }
+    return [$video, $liststore, $iter];
 }
 
 sub add_channel_entry {
@@ -3213,9 +3129,7 @@ $symbols{subs}\t %s subs",
                     8 => $yv_obj->make_json_string($channel),
                    );
 
-    if ($CONFIG{show_thumbs}) {
-        set_thumbnail($channel, $liststore, $iter);
-    }
+    return [$channel, $liststore, $iter];
 }
 
 sub add_playlist_entry {
@@ -3266,9 +3180,7 @@ $symbols{video}\t %s videos",
                     8 => $yv_obj->make_json_string($playlist),
                    );
 
-    if ($CONFIG{show_thumbs}) {
-        set_thumbnail($playlist, $liststore, $iter);
-    }
+    return [$playlist, $liststore, $iter];
 }
 
 sub list_playlist {
@@ -3649,7 +3561,7 @@ sub execute_external_program {
     }
 }
 
-sub make_youtube_url {
+sub make_lbry_url {
     my ($type, $code) = @_;
 
     my $format = (
@@ -3663,7 +3575,7 @@ sub make_youtube_url {
         return sprintf($format, $code);
     }
 
-    return "https://www.youtube.com";
+    return "https://open.lbry.com";     # should not happen
 }
 
 sub open_external_url {
@@ -4021,14 +3933,19 @@ sub set_entry_details {
     if ($type eq 'video') {
 
         if ($opt{extra_info}) {
-            my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($info));
-            foreach my $key (keys %$extra_info) {
 
-                if ($key eq 'videoThumbnails') {
-                    next if defined($info->{$key});
+            $info->{extra_info} //= defined($info->{keywords});
+
+            if (not $info->{extra_info}) {
+
+                my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($info));
+
+                foreach my $key (keys %$extra_info) {
+                    if ($key eq 'videoThumbnails') {
+                        next if defined($info->{$key});
+                    }
+                    $info->{$key} = $extra_info->{$key} if defined($extra_info->{$key});
                 }
-
-                $info->{$key} = $extra_info->{$key} if defined($extra_info->{$key});
             }
         }
 
@@ -4093,7 +4010,7 @@ EOT
     $gui->get_object('video_details_label')->set_label("<big>" . encode_entities("\n" . $text_info) . "</big>");
 
     # Setting the link button
-    my $url        = make_youtube_url($type, $code);
+    my $url        = make_lbry_url($type, $code);
     my $linkbutton = $gui->get_object('linkbutton1');
 
     $linkbutton->set_label("Open video in browser");

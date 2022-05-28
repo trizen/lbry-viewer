@@ -113,8 +113,7 @@ my %valid_options = (
     authentication_file => {valid => qr/^./, default => undef},
     api_host            => {valid => qr/\w/, default => "auto"},
 
-    librarian_url => {valid => qr/\w/, default => 'https://lbry.bcow.xyz'},
-
+    #librarian_url => {valid => qr/\w/, default => 'https://lbry.bcow.xyz'},
     #librarian_url => {valid => qr/\w/, default => 'https://lbry.vern.cc'},
 
 #<<<
@@ -670,19 +669,27 @@ sub pick_random_instance {
 sub pick_and_set_random_instance {
     my ($self) = @_;
 
-    return;    # TODO: implement it
+    #return "lbry.bcow.xyz";
 
-    my $instance = $self->pick_random_instance() // return;
+    my @list = qw(
+        lbry.bcow.xyz
+        librarian.pussthecat.org
+        lbry.mutahar.rocks
+        librarian.esmailelbob.xyz
+        lbry.vern.cc
+    );
 
-    ref($instance) eq 'ARRAY' or return;
+    # Select a random instance
+    #my $instance = $list[rand @list];
 
-    my $uri = $instance->[1]{uri} // return;
-    $uri =~ s{/+\z}{};    # remove trailing '/'
+    # For now, pick the first one, as it is the official one == more likely to work
+    my $instance = $list[0];
 
-    $self->set_api_host($uri);
+    # Set the instance
+    $self->set_api_host("https://$instance");
 }
 
-sub get_api_url {
+sub get_librarian_url {
     my ($self) = @_;
 
     my $host = $self->get_api_host;
@@ -704,21 +711,21 @@ sub get_api_url {
         $host = $protocol . $host;
     }
 
-    # Pick a random instance when `--instance=auto` or `--instance=invidio.us`.
-    if ($host eq 'auto' or $host =~ m{^https://(?:www\.)?invidio\.us\b}) {
+    # Pick a random instance when `--instance=auto`
+    if ($host eq 'auto') {
 
         if (defined($self->pick_and_set_random_instance())) {
             $host = $self->get_api_host();
             print STDERR ":: Changed the instance to: $host\n" if $self->get_debug;
         }
         else {
-            $host = "https://invidious.snopyta.org";
+            $host = "https://lbry.bcow.xyz";
             $self->set_api_host($host);
             print STDERR ":: Failed to change the instance. Using: $host\n" if $self->get_debug;
         }
     }
 
-    join('', $host, $self->get_api_path);
+    return $host;
 }
 
 sub _simple_feeds_url {

@@ -1601,7 +1601,7 @@ for (my $i = 0 ; $i <= $#ARGV ; $i++) {
 
     next if (substr($arg, 0, 1) eq q{-});
 
-    if (youtube_urls($arg)) {
+    if (lbry_urls($arg)) {
         splice(@ARGV, $i--, 1);
     }
 }
@@ -1725,7 +1725,7 @@ HELP
                     exit 1;
                 }
             }
-            elsif (youtube_urls($key)) {
+            elsif (lbry_urls($key)) {
                 ## ok
             }
             else {
@@ -2039,7 +2039,7 @@ sub _bold_color {
     return colored($text, 'bold');
 }
 
-sub youtube_urls {
+sub lbry_urls {
     my ($arg) = @_;
 
     if ($arg =~ /$get_video_id_re/) {
@@ -2158,13 +2158,6 @@ sub warn_cant_do {
 
     foreach my $videoID (@ids) {
         warn colored("\n[!] Can't $action video: " . sprintf($CONFIG{lbry_video_url}, $videoID), 'bold red') . "\n";
-
-        my %info = $yv_obj->_get_video_info($videoID);
-        my $resp = $yv_obj->parse_json_string($info{player_response} // next);
-
-        if (eval { exists($resp->{playabilityStatus}) and $resp->{playabilityStatus}{status} =~ /error/i }) {
-            warn colored("[+] Reason: $resp->{playabilityStatus}{reason}.", 'bold yellow') . "\n";
-        }
     }
 }
 
@@ -2553,7 +2546,7 @@ sub print_channels {
                 warn_invalid('option', $opt);
             }
         }
-        elsif (youtube_urls($key)) {
+        elsif (lbry_urls($key)) {
             ## ok
         }
         elsif (valid_num($key, $channels)) {
@@ -2682,7 +2675,7 @@ sub print_comments {
                 warn_invalid('option', $opt);
             }
         }
-        elsif (youtube_urls($key)) {
+        elsif (lbry_urls($key)) {
             ## ok
         }
         elsif (valid_num($key, $comments)) {
@@ -3091,7 +3084,7 @@ sub print_categories {
                 warn_invalid('option', $opt);
             }
         }
-        elsif (youtube_urls($key)) {
+        elsif (lbry_urls($key)) {
             ## ok
         }
         elsif (valid_num($key, $categories)) {
@@ -3214,7 +3207,7 @@ sub print_playlists {
                 warn_invalid('option', $opt);
             }
         }
-        elsif (youtube_urls($key)) {
+        elsif (lbry_urls($key)) {
             ## ok
         }
         elsif (valid_num($key, $playlists) and not $contains_keywords) {
@@ -3822,16 +3815,20 @@ sub print_video_info {
     my ($video) = @_;
 
     $opt{show_video_info} || return 1;
+    $video->{extra_info} //= defined($video->{keywords});
 
-    my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($video) // return 1);
+    if (not $video->{extra_info}) {
 
-    foreach my $key (keys %$extra_info) {
+        my $extra_info = $yv_obj->video_details($yv_utils->get_video_id($video) // return 1);
 
-        if ($key eq 'videoThumbnails') {
-            next if defined($video->{$key});
+        foreach my $key (keys %$extra_info) {
+
+            if ($key eq 'videoThumbnails') {
+                next if defined($video->{$key});
+            }
+
+            $video->{$key} = $extra_info->{$key} if defined($extra_info->{$key});
         }
-
-        $video->{$key} = $extra_info->{$key} if defined($extra_info->{$key});
     }
 
     my $hr = '-' x ($opt{get_term_width} ? get_term_width() : $term_width);
@@ -4268,7 +4265,7 @@ sub print_videos {
                 warn_invalid('option', $opt);
             }
         }
-        elsif (youtube_urls($key)) {
+        elsif (lbry_urls($key)) {
             ## ok
         }
         elsif (!$contains_keywords and (valid_num($key, $videos) or $key =~ /$range_num_re/)) {
@@ -4358,11 +4355,11 @@ main_quit(0);
 
 =head2 api_host
 
-Hostname of an invidious instance. When set to C<"auto">, a random invidious instance is selected on-demand.
+Hostname of Librarian instance. When set to C<"auto">, a random Librarian instance is selected.
 
 List of public invidious instances:
 
-    https://api.invidious.io/
+    https://codeberg.org/librarian/librarian#clearnet
 
 =head2 auto_captions
 

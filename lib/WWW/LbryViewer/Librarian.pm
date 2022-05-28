@@ -700,6 +700,16 @@ sub lbry_video_info {
     my $url  = $self->get_librarian_url . '/' . $args{id};
     my $hash = $self->_get_librarian_data($url) // return;
 
+    my $info = $hash->{html}[0]{body}[0];
+
+    #say join ' ', keys %$info;
+    #use Data::Dump qw(pp);
+    #pp $info->{div};
+    #pp $hash;
+    #exit;
+
+    return;
+
     # TODO: implement it
 
     ref($hash) eq 'HASH' or return;

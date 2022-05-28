@@ -106,7 +106,7 @@ To make the change permanent, set in the configuration file:
     api_host => "lbry.vern.cc",
 ```
 
-When `api_host` is set to `"auto"`, `lbry-viewer` picks a random invidious instance from [codeberg.org/librarian/librarian](https://codeberg.org/librarian/librarian#clearnet).
+When `api_host` is set to `"auto"`, `lbry-viewer` picks a random instance from [codeberg.org/librarian/librarian](https://codeberg.org/librarian/librarian#clearnet).
 
 ### SUPPORT AND DOCUMENTATION
 

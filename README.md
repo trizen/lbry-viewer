@@ -62,6 +62,7 @@ To install `gtk-lbry-viewer` along with `lbry-viewer`, run:
 * [Data::Dump](https://metacpan.org/release/Data-Dump)
 * [JSON](https://metacpan.org/release/JSON)
 * [HTML::Tree](https://metacpan.org/release/HTML-Tree)
+* [yt-dlp](https://github.com/yt-dlp/yt-dlp) or [youtube-dl](https://github.com/ytdl-org/youtube-dl).
 
 #### For gtk-lbry-viewer:
 
@@ -79,7 +80,6 @@ To install `gtk-lbry-viewer` along with `lbry-viewer`, run:
 * Better STDIN support (+history): [Term::ReadLine::Gnu](https://metacpan.org/release/Term-ReadLine-Gnu)
 * Faster JSON deserialization: [JSON::XS](https://metacpan.org/release/JSON-XS)
 * Fixed-width formatting: [Unicode::LineBreak](https://metacpan.org/release/Unicode-LineBreak) or [Text::CharWidth](https://metacpan.org/release/Text-CharWidth)
-* [yt-dlp](https://github.com/yt-dlp/yt-dlp) or [youtube-dl](https://github.com/ytdl-org/youtube-dl).
 
 
 ### PACKAGING

@@ -2585,20 +2585,20 @@ sub lwp_get {
 }
 
 sub get_pixbuf_thumbnail_from_content {
-    my ($thumbnail, $xsize, $ysize) = @_;
+    my ($thumbnail, $url, $xsize, $ysize) = @_;
 
     $xsize //= 160;
     $ysize //= 90;
 
-    require Digest::MD5;
-
-    my $md5 = Digest::MD5::md5_hex($thumbnail // return $default_thumb);
-    my $key = "$md5 $xsize $ysize";
+    $thumbnail // return $default_thumb;
 
     state %cache;
 
-    if (exists $cache{$key}) {
-        return $cache{$key};
+    require Digest::MD5;
+    my $md5_hash = Digest::MD5::md5_hex($url);
+
+    if (exists $cache{$md5_hash}) {
+        return $cache{$md5_hash};
     }
 
     my $pixbuf;
@@ -2622,27 +2622,43 @@ sub get_pixbuf_thumbnail_from_content {
         };
     }
 
-    if (defined($pixbuf)) {
-        $cache{$key} = $pixbuf;
+    if (defined($pixbuf) and !get_thumbnail_from_cache($url)) {
+
+        my $buffer = eval { pack('C*', @{$pixbuf->save_to_buffer('jpeg')}) };
+
+        if (defined($buffer)) {
+            $THUMBNAILS_CACHE->{$md5_hash}{data}      = $buffer;
+            $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;
+        }
     }
 
     $pixbuf //= $default_thumb;
+    $cache{$md5_hash} = $pixbuf;
 
     return $pixbuf;
+}
+
+sub get_thumbnail_from_cache {
+    my ($url) = @_;
+
+    require Digest::MD5;
+    my $md5_hash = Digest::MD5::md5_hex($url);
+
+    exists($THUMBNAILS_CACHE->{$md5_hash}) || return undef;
+
+    my $data = $THUMBNAILS_CACHE->{$md5_hash}{data};
+
+    if (defined($data)) {
+        $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;    # update the cache hit timestamp
+    }
+
+    return $data;
 }
 
 sub get_pixbuf_thumbnail_from_url {
     my ($url, $xsize, $ysize) = @_;
 
-    state %cache;
-
-    my $key = "$url $xsize $ysize";
-
-    if (exists $cache{$key}) {
-        return $cache{$key};
-    }
-
-    my $thumbnail = lwp_get($url);
+    my $thumbnail = get_thumbnail_from_cache($url) // lwp_get($url);
 
     if (not defined($thumbnail)) {
         if ($url =~ s{/mq([0-9])\.}{/$1.}) {
@@ -2650,11 +2666,7 @@ sub get_pixbuf_thumbnail_from_url {
         }
     }
 
-    my $pixbuf = get_pixbuf_thumbnail_from_content($thumbnail, $xsize, $ysize);
-
-    if (defined($pixbuf)) {
-        $cache{$key} = $pixbuf;
-    }
+    my $pixbuf = get_pixbuf_thumbnail_from_content($thumbnail, $url, $xsize, $ysize);
 
     return $pixbuf;
 }
@@ -2662,45 +2674,11 @@ sub get_pixbuf_thumbnail_from_url {
 sub get_pixbuf_thumbnail_from_entry {
     my ($entry) = @_;
 
-    require Digest::MD5;
-
-    my $thumbnail_url = $yv_utils->get_thumbnail_url($entry, $CONFIG{thumbnail_type});
-    my $md5_hash      = Digest::MD5::md5_hex($thumbnail_url);
-
-    my $thumbnail_data = $entry->{_thumbnail_data} // do {
-        exists($THUMBNAILS_CACHE->{$md5_hash})
-          ? do {
-            my $data = $THUMBNAILS_CACHE->{$md5_hash}{data};
-            if (defined($data)) {
-                $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;    # update the cache hit timestamp
-            }
-            $data;
-          }
-          : undef;
-      }
-      // lwp_get($thumbnail_url);
-
-    # Don't cache thumbnails that failed to be retrieved.
-    if (not $thumbnail_data) {
-        delete $entry->{_thumbnail_data};
-        delete $THUMBNAILS_CACHE->{$md5_hash};
-    }
+    my $thumbnail_url  = $yv_utils->get_thumbnail_url($entry, $CONFIG{thumbnail_type});
+    my $thumbnail_data = get_thumbnail_from_cache($thumbnail_url) // lwp_get($thumbnail_url);
 
     my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
-    my $pixbuf        = get_pixbuf_thumbnail_from_content($thumbnail_data, ($square_format ? (160, 160) : ()));
-
-    if (defined($pixbuf) and not $entry->{_thumbnail_data}) {
-        my $buffer = eval { pack('C*', @{$pixbuf->save_to_buffer('jpeg')}) };
-
-        if (defined($buffer)) {
-            $entry->{_thumbnail_data} = $buffer;
-
-            if (not exists $THUMBNAILS_CACHE->{$md5_hash}) {
-                $THUMBNAILS_CACHE->{$md5_hash}{data}      = $buffer;
-                $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;
-            }
-        }
-    }
+    my $pixbuf        = get_pixbuf_thumbnail_from_content($thumbnail_data, $thumbnail_url, ($square_format ? (160, 160) : ()));
 
     return $pixbuf;
 }

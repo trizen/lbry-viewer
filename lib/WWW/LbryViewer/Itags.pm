@@ -41,6 +41,7 @@ Reference: https://en.wikipedia.org/wiki/YouTube#Quality_and_formats
 sub get_itags {
     scalar {
 
+        'best' => [{value => 'b',       format => 'mp4'}],
         '1080' => [{value => 'hls-316', format => 'mp4'},],
 
         '720' => [{value => "hls-176", format => 'mp4'}, {value => "hls-246", format => 'mp4'},],

@@ -765,7 +765,7 @@ sub _extract_from_ytdl {
     if (!@formats and defined($ref->{url})) {
         push @formats,
           scalar {
-                  itag => 'hls-176',
+                  itag => 'b',
                   type => 'video/mp4',
                   url  => $ref->{url},
                  };
@@ -1121,7 +1121,7 @@ sub get_streaming_urls {
     if (!@streaming_urls) {
         push @streaming_urls,
           {
-            itag => 'hls-176',
+            itag => 'b',
             type => "video/mp4",
             url  => "https://open.lbry.com/$videoID",
           };

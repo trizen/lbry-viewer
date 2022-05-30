@@ -1123,7 +1123,7 @@ sub get_streaming_urls {
           {
             itag => 'b',
             type => "video/mp4",
-            url  => "https://open.lbry.com/$videoID",
+            url  => "https://odysee.com/$videoID",
           };
     }
 

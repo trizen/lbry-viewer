@@ -97,6 +97,7 @@ my $youtube_users_file       = catfile($config_dir, 'users.txt');
 my $subscribed_channels_file = catfile($config_dir, 'subscribed_channels.txt');
 my $history_file             = catfile($config_dir, 'gtk-history.txt');
 my $session_file             = catfile($config_dir, 'session.dat');
+my $thumbnails_file          = catfile($config_dir, 'thumbnails.dat');
 my $watched_file             = catfile($config_dir, 'watched.txt');
 
 # Special local playlists
@@ -127,6 +128,9 @@ my @VIDEO_QUEUE;
 
 # Keep track of watched videos
 my %WATCHED_VIDEOS;
+
+# Cache for thumbnails
+my $THUMBNAILS_CACHE = {};
 
 sub which_command {
     my ($cmd) = @_;
@@ -285,6 +289,7 @@ my %CONFIG = (
     history_limit          => 100_000,
     history_file           => $history_file,
     recent_history         => 10,
+    cache_thumbnails       => 1,
     remember_session       => 1,
     remember_session_depth => 10,
     entry_completion_limit => 10,
@@ -2657,20 +2662,44 @@ sub get_pixbuf_thumbnail_from_url {
 sub get_pixbuf_thumbnail_from_entry {
     my ($entry) = @_;
 
-    my $thumbnail_url  = $yv_utils->get_thumbnail_url($entry, $CONFIG{thumbnail_type});
-    my $thumbnail_data = $entry->{_thumbnail_data} // lwp_get($thumbnail_url);
+    require Digest::MD5;
+
+    my $thumbnail_url = $yv_utils->get_thumbnail_url($entry, $CONFIG{thumbnail_type});
+    my $md5_hash      = Digest::MD5::md5_hex($thumbnail_url);
+
+    my $thumbnail_data = $entry->{_thumbnail_data} // do {
+        exists($THUMBNAILS_CACHE->{$md5_hash})
+          ? do {
+            my $data = $THUMBNAILS_CACHE->{$md5_hash}{data};
+            if (defined($data)) {
+                $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;    # update the cache hit timestamp
+            }
+            $data;
+          }
+          : undef;
+      }
+      // lwp_get($thumbnail_url);
 
     # Don't cache thumbnails that failed to be retrieved.
     if (not $thumbnail_data) {
         delete $entry->{_thumbnail_data};
+        delete $THUMBNAILS_CACHE->{$md5_hash};
     }
 
     my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
     my $pixbuf        = get_pixbuf_thumbnail_from_content($thumbnail_data, ($square_format ? (160, 160) : ()));
 
     if (defined($pixbuf) and not $entry->{_thumbnail_data}) {
-        my $buffer = pack('C*', @{$pixbuf->save_to_buffer('jpeg')});
-        $entry->{_thumbnail_data} = $buffer;
+        my $buffer = eval { pack('C*', @{$pixbuf->save_to_buffer('jpeg')}) };
+
+        if (defined($buffer)) {
+            $entry->{_thumbnail_data} = $buffer;
+
+            if (not exists $THUMBNAILS_CACHE->{$md5_hash}) {
+                $THUMBNAILS_CACHE->{$md5_hash}{data}      = $buffer;
+                $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;
+            }
+        }
     }
 
     return $pixbuf;
@@ -3575,7 +3604,7 @@ sub make_lbry_url {
         return sprintf($format, $code);
     }
 
-    return "https://open.lbry.com";     # should not happen
+    return "https://open.lbry.com";    # should not happen
 }
 
 sub open_external_url {
@@ -3859,6 +3888,22 @@ sub save_session {
                     },
                     $session_file
                    );
+
+    # Keep only thumbnails that have been accessed in the past 3 days
+    my @keys = grep { time - $THUMBNAILS_CACHE->{$_}{timestamp} <= 259200 } keys %{$THUMBNAILS_CACHE};
+
+    if ($yv_obj->get_debug) {
+        say "[1] Cached thumbnails: ", scalar keys %{$THUMBNAILS_CACHE};
+    }
+
+    my %common_thumbnails;
+    @common_thumbnails{@keys} = @{$THUMBNAILS_CACHE}{@keys};
+
+    if ($yv_obj->get_debug) {
+        say "[2] Cached thumbnails: ", scalar keys %common_thumbnails;
+    }
+
+    Storable::store(\%common_thumbnails, $thumbnails_file);
 }
 
 sub add_results_to_history {
@@ -4084,6 +4129,14 @@ sub on_mainw_destroy {
 }
 
 $notebook->set_current_page($CONFIG{default_notebook_page});
+
+if ($CONFIG{cache_thumbnails} and -f $thumbnails_file) {
+    $THUMBNAILS_CACHE = eval { Storable::retrieve($thumbnails_file) } // do {
+        warn "[!] Failed to load the cached thumbnails...\n";
+        warn "[!] Reason: $@\n" if $@;
+        scalar {};
+    };
+}
 
 if ($CONFIG{remember_session} and -f $session_file) {
 

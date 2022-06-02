@@ -285,15 +285,19 @@ my %CONFIG = (
     youtube_users_file       => $youtube_users_file,
     subscribed_channels_file => $subscribed_channels_file,
 
-    history                => 1,
-    history_limit          => 100_000,
-    history_file           => $history_file,
-    recent_history         => 10,
-    cache_thumbnails       => 1,
+    history        => 1,
+    history_limit  => 100_000,
+    history_file   => $history_file,
+    recent_history => 10,
+
     remember_session       => 1,
     remember_session_depth => 10,
+
     entry_completion_limit => 10,
     local_playlist_limit   => -1,
+
+    cache_thumbnails        => 1,
+    cache_thumbnails_format => 'jpeg',
 
     # Save titles
     save_titles_to_history  => 0,
@@ -2595,10 +2599,10 @@ sub get_pixbuf_thumbnail_from_content {
     state %cache;
 
     require Digest::MD5;
-    my $md5_hash = Digest::MD5::md5_hex($url);
+    my $key = Digest::MD5::md5_hex($url);
 
-    if (exists $cache{$md5_hash}) {
-        return $cache{$md5_hash};
+    if (exists $cache{$key}) {
+        return $cache{$key};
     }
 
     my $pixbuf;
@@ -2624,32 +2628,45 @@ sub get_pixbuf_thumbnail_from_content {
 
     if (defined($pixbuf) and !get_thumbnail_from_cache($url)) {
 
-        my $buffer = eval { pack('C*', @{$pixbuf->save_to_buffer('jpeg')}) };
+        my $buffer = eval { pack('C*', @{$pixbuf->save_to_buffer($CONFIG{cache_thumbnails_format})}) };
 
         if (defined($buffer)) {
-            $THUMBNAILS_CACHE->{$md5_hash}{data}      = $buffer;
-            $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;
+            add_thumbnail_to_cache($url, $buffer);
         }
     }
 
     $pixbuf //= $default_thumb;
-    $cache{$md5_hash} = $pixbuf;
+    $cache{$key} = $pixbuf;
 
     return $pixbuf;
+}
+
+sub add_thumbnail_to_cache {
+    my ($url, $data) = @_;
+
+    $data // return;
+
+    require Digest::MD5;
+    my $key = Digest::MD5::md5_hex($url);
+
+    $THUMBNAILS_CACHE->{$key}{data}      = $data;
+    $THUMBNAILS_CACHE->{$key}{timestamp} = time;
+
+    return 1;
 }
 
 sub get_thumbnail_from_cache {
     my ($url) = @_;
 
     require Digest::MD5;
-    my $md5_hash = Digest::MD5::md5_hex($url);
+    my $key = Digest::MD5::md5_hex($url);
 
-    exists($THUMBNAILS_CACHE->{$md5_hash}) || return undef;
+    exists($THUMBNAILS_CACHE->{$key}) || return undef;
 
-    my $data = $THUMBNAILS_CACHE->{$md5_hash}{data};
+    my $data = $THUMBNAILS_CACHE->{$key}{data};
 
     if (defined($data)) {
-        $THUMBNAILS_CACHE->{$md5_hash}{timestamp} = time;    # update the cache hit timestamp
+        $THUMBNAILS_CACHE->{$key}{timestamp} = time;    # update the cache hit timestamp
     }
 
     return $data;
@@ -2662,7 +2679,7 @@ sub get_pixbuf_thumbnail_from_url {
 
     if (not defined($thumbnail)) {
         if ($url =~ s{/mq([0-9])\.}{/$1.}) {
-            $thumbnail = lwp_get($url);
+            $thumbnail = get_thumbnail_from_cache($url) // lwp_get($url);
         }
     }
 

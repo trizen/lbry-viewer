@@ -93,7 +93,7 @@ my $local_playlists_dir = catdir($config_dir,      'playlists');
 
 # Config files
 my $config_file              = catfile($config_dir, "gtk-lbry-viewer.conf");
-my $youtube_users_file       = catfile($config_dir, 'users.txt');
+my $saved_channels_file      = catfile($config_dir, 'users.txt');
 my $subscribed_channels_file = catfile($config_dir, 'subscribed_channels.txt');
 my $history_file             = catfile($config_dir, 'gtk-history.txt');
 my $session_file             = catfile($config_dir, 'session.dat');
@@ -283,7 +283,7 @@ my %CONFIG = (
     # Subscribed channels
     subscriptions_limit      => 10_000,
     subscriptions_lifetime   => 600,
-    youtube_users_file       => $youtube_users_file,
+    saved_channels_file      => $saved_channels_file,
     subscribed_channels_file => $subscribed_channels_file,
 
     history        => 1,
@@ -2033,8 +2033,8 @@ set_local_playlists();
 
 # ------------ Usernames list window ------------ #
 sub set_usernames {
-    if (-e $CONFIG{youtube_users_file}) {
-        %channels = ((map { @$_ } $yv_utils->read_channels_from_file($CONFIG{youtube_users_file})), %channels);
+    if (-e $CONFIG{saved_channels_file}) {
+        %channels = ((map { @$_ } $yv_utils->read_channels_from_file($CONFIG{saved_channels_file})), %channels);
     }
     else {
         # Default channels
@@ -2141,7 +2141,7 @@ sub save_channel_by_id {
     # Save channel to file
     say ":: Saving channel: $channel_name" if $yv_obj->get_debug;
     $channels{$channel_id} = $channel_name;
-    write_channels_to_file(\%channels, $CONFIG{youtube_users_file});
+    write_channels_to_file(\%channels, $CONFIG{saved_channels_file});
     set_usernames();
 }
 
@@ -2188,7 +2188,7 @@ sub remove_selected_username {
 
     $users_liststore->remove($iter);
 
-    write_channels_to_file(\%channels,            $CONFIG{youtube_users_file});
+    write_channels_to_file(\%channels,            $CONFIG{saved_channels_file});
     write_channels_to_file(\%subscribed_channels, $CONFIG{subscribed_channels_file});
 }
 
@@ -2216,7 +2216,7 @@ sub save_usernames_to_file {
 
     set_usernames();    # update channels
 
-    write_channels_to_file(\%channels,            $CONFIG{youtube_users_file});
+    write_channels_to_file(\%channels,            $CONFIG{saved_channels_file});
     write_channels_to_file(\%subscribed_channels, $CONFIG{subscribed_channels_file});
 }
 

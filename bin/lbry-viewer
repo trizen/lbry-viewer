@@ -316,7 +316,7 @@ my %PLAYER_ARGS;    # will store video player arguments
 my $base_options = <<'BASE';
 # Base
 [keywords]        : search for LBRY videos
-[youtube-url]     : play a video by LBRY URL
+[lbry-url]        : play a video by LBRY URL
 :v(ideoid)=ID     : play videos by LBRY video IDs
 [playlist-url]    : display videos from a playlistURL
 :playlist=ID      : display videos from a playlistID

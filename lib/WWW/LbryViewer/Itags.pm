@@ -42,17 +42,26 @@ sub get_itags {
     scalar {
 
         'best' => [{value => 'b',       format => 'mp4'}],
-        '1080' => [{value => 'hls-316', format => 'mp4'},],
+        '1080' => [{value => 'hls-316', format => 'mp4'}, {value => 'hls-4432', format => 'mp4'},],
 
-        '720' => [{value => "hls-176", format => 'mp4'}, {value => "hls-246", format => 'mp4'},],
+        '720' => [{value => "hls-176", format => 'mp4'},
+                  {value => "hls-246", format => 'mp4'},
+                  {value => "hls-660", format => 'mp4'},
+                 ],
 
         '480' => [],
 
-        '360' => [{value => "hls-140-1", format => 'mp4'}, {value => "hls-211", format => 'mp4'},],
+        '360' => [{value => "hls-140-1", format => 'mp4'},
+                  {value => "hls-211",   format => 'mp4'},
+                  {value => "hls-105",   format => 'mp4'},
+                 ],
 
         '240' => [],
 
-        '144' => [{value => "hls-140-0", format => 'mp4'}, {value => "hls-140", format => 'mp4'},],
+        '144' => [{value => "hls-140-0", format => 'mp4'},
+                  {value => "hls-140",   format => 'mp4'},
+                  {value => "hls-70",    format => 'mp4'},
+                 ],
 
         'audio' => [],
            };

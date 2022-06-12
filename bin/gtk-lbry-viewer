@@ -15,7 +15,7 @@
 #-------------------------------------------------------
 #  GTK Lbry Viewer
 #  Fork: 27 May 2022
-#  Edit: 27 May 2022
+#  Edit: 12 June 2022
 #  https://github.com/trizen/lbry-viewer
 #-------------------------------------------------------
 
@@ -31,7 +31,7 @@ no warnings 'once';
 my $DEVEL;                                           # true in devel mode
 use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel only
 
-use WWW::LbryViewer v0.0.2;
+use WWW::LbryViewer v0.0.3;
 use WWW::LbryViewer::RegularExpressions;
 
 use Gtk3 qw(-init);

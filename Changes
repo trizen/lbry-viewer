@@ -5,6 +5,12 @@
 
 [CHANGELOG]
 
+Version 0.0.3
+
+- GUI: added support for highlighting watched videos.
+- GUI: added support for caching thumbnails.
+- Added support for downloading videos at the specified resolution.
+
 Version 0.0.2
 
 - Added support for changing resolution.

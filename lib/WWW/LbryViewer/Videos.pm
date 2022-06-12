@@ -204,7 +204,7 @@ sub _fallback_video_details {
             author => $info->{channel},
 
             #authorId => (split(/\//, $id))[0],
-            authorId => (split(/\//, $info->{channel_url}))[-1],
+            authorId => (split(/\//, ($info->{channel_url} // '')))[-1] // '',
             rating   => $info->{average_rating},
         };
     }

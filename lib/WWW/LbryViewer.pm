@@ -429,6 +429,16 @@ sub lwp_get {
 
     my %lwp_header = ($opt{simple} ? () : $self->_auth_lwp_header);
 
+    if ($url !~ /^https?:/) {    # maybe it's base64 encoded?
+
+        if ($self->get_debug) {
+            say STDERR ":: URL without protocol: $url";
+        }
+
+        require MIME::Base64;
+        $url = MIME::Base64::decode_base64($url);
+    }
+
     my $response = do {
         my $r;
 

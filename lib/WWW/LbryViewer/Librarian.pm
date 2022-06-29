@@ -237,7 +237,13 @@ sub _extract_thumbnails {
              if ($thumb{url} =~ /\?(.+)/) {
                  my %params = $self->parse_query_string($1);
                  if (defined($params{url})) {
+
                      $thumb{url} = $params{url};
+
+                     if ($thumb{url} !~ /^https?:/) {
+                         require MIME::Base64;
+                         $thumb{url} = MIME::Base64::decode_base64($thumb{url});
+                     }
                  }
              }
 

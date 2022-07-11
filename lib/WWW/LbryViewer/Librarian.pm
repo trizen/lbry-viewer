@@ -829,7 +829,7 @@ sub _parse_html {
     require HTML::TreeBuilder;
 
     # Workaround for invalid meta tags (occurring in description)
-    $html =~ s{<meta .*?>}{}g;
+    $html =~ s{<meta .*?>}{}sg;
 
     my $tree = HTML::TreeBuilder->new_from_content($html);
     my $xml  = $tree->as_XML;

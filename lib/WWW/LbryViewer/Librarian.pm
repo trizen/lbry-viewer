@@ -325,7 +325,7 @@ sub _extract_itemSection_entry {
 
             if ($entry->{'-class'} eq 'thumbnailWrapper') {
                 my $link = $entry->{a}[0];
-                $video{videoId}         = ($link->{'-href'} =~ s{^/}{}r);
+                $video{videoId}         = (($link->{'-href'} // '') =~ s{^/}{}r);
                 $video{videoThumbnails} = $self->_extract_thumbnails($link->{img});
 
                 my $p = $entry->{p}[0];
@@ -394,7 +394,7 @@ sub _extract_itemSection_entry {
         foreach my $entry (@{$info}) {
             if ($entry->{'-class'} eq 'thumbnailWrapper') {
                 my $link = $entry->{a}[0];
-                $channel{authorId}         = ($link->{'-href'} =~ s{^/}{}r);
+                $channel{authorId}         = (($link->{'-href'} // '') =~ s{^/}{}r);
                 $channel{authorThumbnails} = $self->_extract_thumbnails($link->{img});
             }
         }
@@ -402,7 +402,7 @@ sub _extract_itemSection_entry {
         $channel{author}   = $links->[0]{a}[0]{'#text'};
         $channel{authorId} = (($links->[1]{a}[0]{'-href'} // $links->[0]{a}[0]{'-href'}) =~ s{^/}{}r);
 
-        if ($links->[2]{'#text'} =~ /([\d,.]+\s*[KMB]?)\s*followers\s*([\d,.]+\s*[KMB]?)\s*uploads/i) {
+        if (($links->[2]{'#text'} // '') =~ /([\d,.]+\s*[KMB]?)\s*followers\s*([\d,.]+\s*[KMB]?)\s*uploads/i) {
             my ($subs, $uploads) = ($1, $2);
             $channel{subCount}   = _extract_subscriber_count($subs);
             $channel{videoCount} = _extract_video_count($uploads);

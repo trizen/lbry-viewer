@@ -53,6 +53,7 @@ sub get_itags {
                   {value => "hls-660",  format => 'mp4'},
                   {value => "hls-2890", format => 'mp4'},
                   {value => "hls-3300", format => 'mp4'},
+                  {value => "hls-1460", format => 'mp4'},
                  ],
 
         '480' => [{value => "hls-1567", format => 'mp4'},],
@@ -62,6 +63,7 @@ sub get_itags {
                   {value => "hls-105",   format => 'mp4'},
                   {value => "hls-655",   format => 'mp4'},
                   {value => "hls-215",   format => 'mp4'},
+                  {value => "hls-525",   format => 'mp4'},
                  ],
 
         '240' => [],
@@ -70,6 +72,7 @@ sub get_itags {
                   {value => "hls-140",   format => 'mp4'},
                   {value => "hls-70",    format => 'mp4'},
                   {value => "hls-180",   format => 'mp4'},
+                  {value => "hls-250",   format => 'mp4'},
                  ],
 
         'audio' => [],

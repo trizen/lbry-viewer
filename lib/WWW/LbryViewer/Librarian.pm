@@ -399,7 +399,7 @@ sub _extract_itemSection_entry {
             }
         }
 
-        $channel{author}   = $links->[0]{a}[0]{'#text'};
+        $channel{author}   = $links->[0]{a}[0]{'#text'} // $links->[1]{a}[0]{'#text'};
         $channel{authorId} = (($links->[1]{a}[0]{'-href'} // $links->[0]{a}[0]{'-href'}) =~ s{^/}{}r);
 
         if (($links->[2]{'#text'} // '') =~ /([\d,.]+\s*[KMB]?)\s*followers\s*([\d,.]+\s*[KMB]?)\s*uploads/i) {

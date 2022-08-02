@@ -893,7 +893,19 @@ sub lbry_search {
 
     my $url = $self->get_librarian_url . "/search";
 
-    my %params = (q => $args{q},);
+    my %params = (q => $args{q});
+
+    $self->{lwp} // $self->set_lwp_useragent;
+
+    my $cookie_jar = $self->{lwp}->cookie_jar;
+    my $domain     = $url;
+
+    if ($domain =~ m{^https?://(.*?)/}) {
+        $domain = $1;
+    }
+
+    # Set the NSFW cookie
+    $cookie_jar->set_cookie(0, "nsfw", ($self->get_nsfw ? "true" : "false"), "/", $domain, undef, 0, "", 3806952123, 0, {},);
 
     # This does not support caching
     # my $content = $self->lwp_post($url, \%params) // return;

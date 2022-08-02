@@ -199,6 +199,7 @@ my %CONFIG = (
     order  => undef,
     date   => undef,
     region => undef,
+    nsfw   => 0,
 
     # Comments order
     comments_order => 'top',    # valid values: top, new
@@ -831,9 +832,9 @@ usage: $execname [options] ([url] | [keywords])
     --custom-playlist-layout=s : custom layout format for playlists
 
  * Other
-   --invidious!         : prefer invidious instances over parsing LBRY
    --api=s              : set an API host from https://api.invidious.io/
    --api=auto           : use a random instance of invidious
+   --nsfw!              : show NSFW videos in search results
    --cookies=s          : file to read cookies from and dump cookie
    --user-agent=s       : specify a custom user agent
    --proxy=s            : set HTTP(S)/SOCKS proxy: 'proto://domain.tld:port/'
@@ -1134,7 +1135,7 @@ sub apply_configuration {
                              prefer_mp4 prefer_av1 prefer_invidious
                              ytdlp_comments ytdlp_max_comments
                              ytdlp_max_replies
-                             bypass_age_gate_with_proxy
+                             bypass_age_gate_with_proxy nsfw
                              )
       ) {
 
@@ -1414,6 +1415,7 @@ sub parse_arguments {
         '2160p'   => sub { $opt{resolution} = 2160 },
         'best'    => sub { $opt{resolution} = 'best' },
 
+        'nsfw!'            => \$opt{nsfw},
         'hfr!'             => \$opt{hfr},
         'res|resolution=s' => \$opt{resolution},
 

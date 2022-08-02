@@ -90,6 +90,7 @@ my %valid_options = (
     ytdlp_max_replies  => {valid => qr/^(?:\d+|all)\z/, default => 0},
 
     # Booleans
+    nsfw                       => {valid => [1, 0], default => 0},
     env_proxy                  => {valid => [1, 0], default => 1},
     escape_utf8                => {valid => [1, 0], default => 0},
     prefer_mp4                 => {valid => [1, 0], default => 0},
@@ -354,16 +355,8 @@ sub set_lwp_useragent {
         $agent->cookie_jar($cookies);
     }
     else {
-
         require HTTP::Cookies;
-
         my $cookies = HTTP::Cookies->new();
-
-        # Consent cookie
-        $cookies->set_cookie(0, "CONSENT", "YES+cb-m.20210615-14-p0.en+FX+096",
-                             "/", ".youtube.com", undef, 0, 1, '21' . join('', map { int(rand(10)) } 1 .. 8),
-                             0, {});
-
         $agent->cookie_jar($cookies);
     }
 

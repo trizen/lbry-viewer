@@ -34,7 +34,7 @@ use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel only
 use WWW::LbryViewer v0.0.3;
 use WWW::LbryViewer::RegularExpressions;
 
-use Gtk3 qw(-init);
+use Gtk3                  qw(-init);
 use File::Spec::Functions qw(
   rel2abs
   catdir
@@ -216,9 +216,11 @@ my %CONFIG = (
     maxResults       => 10,
     hfr              => 1,        # true to prefer high frame rate (HFR) videos
     resolution       => 'best',
-    videoDimension   => undef,
-    videoLicense     => undef,
-    region           => undef,
+
+    videoDimension => undef,
+    videoLicense   => undef,
+    region         => undef,
+    nsfw           => 0,
 
     comments_width => 80,         # wrap comments longer than `n` characters
     comments_order => 'top',      # valid values: time, relevance
@@ -941,7 +943,7 @@ sub apply_configuration {
                              comments_order prefer_invidious
                              force_fallback ytdlp_comments
                              ytdlp_max_comments ytdlp_max_replies
-                             bypass_age_gate_with_proxy
+                             bypass_age_gate_with_proxy nsfw
                              )
       ) {
 

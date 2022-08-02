@@ -68,6 +68,7 @@ To install `gtk-lbry-viewer` along with `lbry-viewer`, run:
 
 * [Gtk3](https://metacpan.org/release/Gtk3)
 * [File::ShareDir](https://metacpan.org/release/File-ShareDir)
+* [webp-pixbuf-loader](https://github.com/aruiz/webp-pixbuf-loader)
 * \+ the dependencies required by lbry-viewer.
 
 #### Build dependencies:

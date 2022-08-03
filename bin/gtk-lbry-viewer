@@ -206,7 +206,6 @@ my %CONFIG = (
 
     # LBRY options
     split_videos     => 1,
-    dash             => 1,        # may load slow
     prefer_mp4       => 0,
     prefer_av1       => 0,
     ignore_av1       => 0,
@@ -412,7 +411,7 @@ my %objects = (
     'thumbs_checkbutton'     => \my $thumbs_checkbutton,
     'fullscreen_checkbutton' => \my $fullscreen_checkbutton,
     'clear_list_checkbutton' => \my $clear_list_checkbutton,
-    'dash_checkbutton'       => \my $dash_checkbutton,
+    'nsfw_checkbutton'       => \my $nsfw_checkbutton,
     'audio_only_checkbutton' => \my $audio_only_checkbutton,
     'hbox2'                  => \my $hbox2,
     'feeds_title'            => \my $feeds_title,
@@ -924,8 +923,8 @@ sub apply_configuration {
     # Audio-only mode
     $audio_only_checkbutton->set_active($CONFIG{audio_only});
 
-    # DASH mode
-    $dash_checkbutton->set_active($CONFIG{dash});
+    # NSFW mode
+    $nsfw_checkbutton->set_active($CONFIG{nsfw});
 
     $clear_list_checkbutton->set_active($CONFIG{clear_search_list});
     $panel_account_type_combobox->set_active($CONFIG{active_panel_account_combobox});
@@ -1922,9 +1921,10 @@ sub toggled_audio_only {
     $CONFIG{audio_only} = $audio_only_checkbutton->get_active() || 0;
 }
 
-# DASH mode
-sub toggled_dash_support {
-    $CONFIG{dash} = $dash_checkbutton->get_active() || 0;
+# NSFW mode
+sub toggled_nsfw_support {
+    $CONFIG{nsfw} = $nsfw_checkbutton->get_active() || 0;
+    $yv_obj->set_nsfw($CONFIG{nsfw});
 }
 
 # Check buttons toggles
@@ -3394,7 +3394,6 @@ sub get_streaming_url {
 
         split      => $CONFIG{split_videos},
         prefer_m4a => $CONFIG{prefer_m4a},
-        dash       => $CONFIG{dash},
 
         ignored_projections => $CONFIG{ignored_projections},
     );
@@ -3599,9 +3598,8 @@ sub get_options_as_arguments {
                    'no-interactive' => q{},
                    'resolution'     => $CONFIG{resolution},
                    'download-dir'   => quotemeta(rel2abs($CONFIG{downloads_dir})),
-                   'fullscreen'     => $CONFIG{fullscreen} ? q{}   : undef,
-                   'no-dash'        => $CONFIG{dash}       ? undef : q{},
-                   'no-video'       => $CONFIG{audio_only} ? q{}   : undef,
+                   'fullscreen'     => $CONFIG{fullscreen} ? q{} : undef,
+                   'no-video'       => $CONFIG{audio_only} ? q{} : undef,
                   );
 
     while (my ($argv, $value) = each %options) {

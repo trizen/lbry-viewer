@@ -186,7 +186,6 @@ my %CONFIG = (
     split_videos => 1,
 
     # LBRY options
-    dash            => 1,        # may load slow
     maxResults      => 20,
     hfr             => 1,        # true to prefer high frame rate (HFR) videos
     resolution      => 'best',
@@ -841,7 +840,6 @@ usage: $execname [options] ([url] | [keywords])
                           If authentication is required,
                           use 'proto://user:pass\@domain.tld:port/'
    --split-videos!      : include or exclude the itags for split videos
-   --dash!              : include or exclude segmented DASH streams
    --ytdl!              : use youtube-dl for videos with encrypted signatures
                           `--no-ytdl` will use invidious instances
    --ytdl-cmd=s         : yt-dlp / youtube-dl command (default: $CONFIG{ytdl_cmd})
@@ -1544,7 +1542,6 @@ sub parse_arguments {
 
         'convert-command|convert-cmd=s'     => \$opt{convert_cmd},
         'prefer-m4a!'                       => \$opt{prefer_m4a},
-        'dash|dash-segmented!'              => \$opt{dash},
         'filename|filename-format=s'        => \$opt{video_filename_format},
         'rp|rem-played|remove-played-file!' => \$opt{remove_played_file},
         'info|i|video-info=s'               => \$opt{print_video_info},
@@ -3337,7 +3334,6 @@ sub get_streaming_url {
 
         split      => $split_videos,
         prefer_m4a => $opt{prefer_m4a},
-        dash       => ($opt{download_video} ? 0 : $opt{dash}),
 
         ignored_projections => $opt{ignored_projections},
     );
@@ -4461,10 +4457,6 @@ An array of hash values specifying a custom layout for channel results.
 
 An array of hash values specifying a custom layout for playlist results.
 
-=head2 dash
-
-Include or exclude streams in "Dynamic Adaptive Streaming over HTTP" (DASH) format.
-
 =head2 date
 
 Search for videos uploaded within a specific amount of time.
@@ -4614,6 +4606,10 @@ Arguments for C<ffmpeg> how to merge the files.
 =head2 merge_with_captions
 
 Include closed-captions inside the MKV container (if any).
+
+=head2 nsfw
+
+Include or exclude NSFW videos in search results.
 
 =head2 order
 

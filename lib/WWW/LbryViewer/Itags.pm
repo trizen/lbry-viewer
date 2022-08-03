@@ -155,9 +155,9 @@ sub _find_streaming_url {
         }
 
         # Ignore segmented DASH URLs (they load pretty slow in mpv)
-        if (not $args{dash}) {
-            next if ($entry->{url} =~ m{/api/manifest/dash/});
-        }
+        #~ if (not $args{dash}) {
+        #~ next if ($entry->{url} =~ m{/api/manifest/dash/});
+        #~ }
 
         return $entry;
     }
@@ -177,7 +177,6 @@ Return the streaming URL which corresponds with the specified resolution.
         ignore_av1     => 1/0,     # true to ignore videos in AV1 format
         split          => 1/0,     # include or exclude split videos
         m4a_audio      => 1/0,     # incldue or exclude M4A audio files
-        dash           => 1/0,     # include or exclude streams in DASH format
     )
 
 =cut

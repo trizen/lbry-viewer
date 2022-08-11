@@ -37,7 +37,7 @@ WWW::LbryViewer - A simple interface to YouTube.
 
 =cut
 
-our $VERSION = '0.0.3';
+our $VERSION = '0.0.4';
 
 =head1 SYNOPSIS
 

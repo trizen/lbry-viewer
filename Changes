@@ -5,6 +5,12 @@
 
 [CHANGELOG]
 
+Version 0.0.4
+
+- Recognize several more video formats.
+- Added support for searching for NSFW videos.
+- Several bug-fixes and improvements.
+
 Version 0.0.3
 
 - GUI: added support for highlighting watched videos.

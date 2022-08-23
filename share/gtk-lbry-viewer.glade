@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!-- Generated with glade 3.38.2 
+<!-- Generated with glade 3.40.0 
 
 Copyright (C) Copyright © 2010-2022 Trizen
 
@@ -289,6 +289,7 @@ Author: Trizen https://github.com/trizen
         <property name="visible">True</property>
         <property name="can-focus">False</property>
         <property name="orientation">vertical</property>
+        <property name="spacing">2</property>
         <child>
           <object class="GtkMenuBar" id="menubar1">
             <property name="visible">True</property>
@@ -503,17 +504,7 @@ Author: Trizen https://github.com/trizen
           <object class="GtkBox" id="hbox1">
             <property name="visible">True</property>
             <property name="can-focus">False</property>
-            <child>
-              <object class="GtkImage" id="gif_spinner">
-                <property name="can-focus">False</property>
-              </object>
-              <packing>
-                <property name="expand">False</property>
-                <property name="fill">False</property>
-                <property name="pack-type">end</property>
-                <property name="position">0</property>
-              </packing>
-            </child>
+            <property name="border-width">4</property>
             <child>
               <object class="GtkEntry" id="search_entry">
                 <property name="visible">True</property>
@@ -532,6 +523,34 @@ Author: Trizen https://github.com/trizen
               <packing>
                 <property name="expand">True</property>
                 <property name="fill">True</property>
+                <property name="position">0</property>
+              </packing>
+            </child>
+            <child>
+              <object class="GtkButtonBox" id="hbuttonbox6">
+                <property name="visible">True</property>
+                <property name="can-focus">False</property>
+                <property name="layout-style">spread</property>
+                <child>
+                  <object class="GtkButton" id="button8">
+                    <property name="label">gtk-find</property>
+                    <property name="visible">True</property>
+                    <property name="can-focus">True</property>
+                    <property name="receives-default">True</property>
+                    <property name="use-stock">True</property>
+                    <signal name="clicked" handler="search" swapped="no"/>
+                  </object>
+                  <packing>
+                    <property name="expand">False</property>
+                    <property name="fill">False</property>
+                    <property name="position">0</property>
+                  </packing>
+                </child>
+              </object>
+              <packing>
+                <property name="expand">False</property>
+                <property name="fill">False</property>
+                <property name="padding">14</property>
                 <property name="position">1</property>
               </packing>
             </child>
@@ -567,7 +586,7 @@ Author: Trizen https://github.com/trizen
                       <object class="GtkTreeViewColumn" id="treeviewcolumn2">
                         <property name="visible">False</property>
                         <property name="resizable">True</property>
-                        <property name="title" translatable="yes">Thumbnails</property>
+                        <property name="title" translatable="yes">Thumbnail</property>
                         <property name="clickable">True</property>
                         <property name="reorderable">True</property>
                         <child>
@@ -646,6 +665,7 @@ Author: Trizen https://github.com/trizen
                                 <child>
                                   <object class="GtkScrolledWindow" id="subsc_scrollwindow">
                                     <property name="can-focus">True</property>
+                                    <property name="margin-top">4</property>
                                     <property name="hscrollbar-policy">never</property>
                                     <child>
                                       <object class="GtkViewport" id="viewport2">
@@ -927,6 +947,7 @@ Author: Trizen https://github.com/trizen
                                   <object class="GtkScrolledWindow" id="scrolledwindow13">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
+                                    <property name="margin-top">4</property>
                                     <child>
                                       <object class="GtkViewport" id="viewport5">
                                         <property name="visible">True</property>
@@ -936,6 +957,8 @@ Author: Trizen https://github.com/trizen
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
                                             <property name="orientation">vertical</property>
+                                            <property name="spacing">8</property>
+                                            <property name="baseline-position">top</property>
                                             <child>
                                               <object class="GtkFrame" id="frame14">
                                                 <property name="visible">True</property>
@@ -946,7 +969,9 @@ Author: Trizen https://github.com/trizen
                                                   <object class="GtkAlignment" id="alignment11">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkBox" id="vbox9">
                                                         <property name="visible">True</property>
@@ -979,6 +1004,7 @@ Author: Trizen https://github.com/trizen
                                                   <object class="GtkLabel" id="label6">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;Type:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
@@ -1000,7 +1026,9 @@ Author: Trizen https://github.com/trizen
                                                   <object class="GtkAlignment" id="alignment8">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkBox" id="vbox11">
                                                         <property name="visible">True</property>
@@ -1034,6 +1062,7 @@ Author: Trizen https://github.com/trizen
                                                   <object class="GtkLabel" id="label16">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;Order by:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
@@ -1055,7 +1084,9 @@ Author: Trizen https://github.com/trizen
                                                   <object class="GtkAlignment" id="alignment17">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkComboBoxText" id="comboboxtext8">
                                                         <property name="visible">True</property>
@@ -1077,6 +1108,7 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkLabel" id="label20">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;Duration:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
@@ -1098,7 +1130,9 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkAlignment" id="alignment18">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkComboBoxText" id="comboboxtext3">
                                                         <property name="visible">True</property>
@@ -1118,6 +1152,7 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkLabel" id="label21">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;Video Caption:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
@@ -1139,7 +1174,9 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkAlignment" id="alignment19">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkComboBoxText" id="comboboxtext4">
                                                         <property name="visible">True</property>
@@ -1159,6 +1196,7 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkLabel" id="label25">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;Video Definition:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
@@ -1180,7 +1218,9 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkAlignment" id="alignment14">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkComboBoxText" id="comboboxtext5">
                                                         <property name="visible">True</property>
@@ -1200,6 +1240,7 @@ long – longer than 20 minutes</property>
                                                   <object class="GtkLabel" id="label23">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
                                                     <property name="label" translatable="yes">&lt;b&gt;Video License:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
@@ -1222,6 +1263,7 @@ long – longer than 20 minutes</property>
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
                                                     <property name="orientation">vertical</property>
+                                                    <property name="spacing">8</property>
                                                     <child>
                                                       <object class="GtkFrame" id="frame11">
                                                         <property name="visible">True</property>
@@ -1232,7 +1274,9 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkAlignment" id="alignment12">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="top-padding">4</property>
                                                             <property name="left-padding">12</property>
+                                                            <property name="right-padding">12</property>
                                                             <child>
                                                             <object class="GtkSpinButton" id="spinbutton1">
                                                             <property name="visible">True</property>
@@ -1257,6 +1301,7 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkLabel" id="label19">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="xpad">4</property>
                                                             <property name="label" translatable="yes">&lt;b&gt;Results per page:&lt;/b&gt;</property>
                                                             <property name="use-markup">True</property>
                                                           </object>
@@ -1278,7 +1323,9 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkAlignment" id="alignment9">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="top-padding">4</property>
                                                             <property name="left-padding">12</property>
+                                                            <property name="right-padding">12</property>
                                                             <child>
                                                             <object class="GtkSpinButton" id="spinbutton2">
                                                             <property name="visible">True</property>
@@ -1302,6 +1349,7 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkLabel" id="label7">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="xpad">4</property>
                                                             <property name="label" translatable="yes">&lt;b&gt;Start with page:&lt;/b&gt;</property>
                                                             <property name="use-markup">True</property>
                                                           </object>
@@ -1323,7 +1371,9 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkAlignment" id="alignment25">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="top-padding">4</property>
                                                             <property name="left-padding">12</property>
+                                                            <property name="right-padding">12</property>
                                                             <child>
                                                             <object class="GtkBox" id="hbox8">
                                                             <property name="visible">True</property>
@@ -1358,6 +1408,7 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkLabel" id="label35">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="xpad">4</property>
                                                             <property name="label" translatable="yes">&lt;b&gt;Published within:&lt;/b&gt;</property>
                                                             <property name="use-markup">True</property>
                                                           </object>
@@ -1379,7 +1430,9 @@ long – longer than 20 minutes</property>
                                                           <object class="GtkAlignment" id="alignment13">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="top-padding">4</property>
                                                             <property name="left-padding">12</property>
+                                                            <property name="right-padding">12</property>
                                                             <child>
                                                             <object class="GtkEntry" id="from_author_entry">
                                                             <property name="visible">True</property>
@@ -1401,6 +1454,7 @@ Unless the author name is valid, this field is ignored.</property>
                                                           <object class="GtkLabel" id="label17">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="xpad">4</property>
                                                             <property name="label" translatable="yes">&lt;b&gt;From author:&lt;/b&gt;</property>
                                                             <property name="use-markup">True</property>
                                                           </object>
@@ -1422,12 +1476,15 @@ Unless the author name is valid, this field is ignored.</property>
                                                           <object class="GtkAlignment" id="alignment1">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="top-padding">4</property>
                                                             <property name="left-padding">12</property>
+                                                            <property name="right-padding">12</property>
                                                             <child>
-                                                            <object class="GtkBox" id="vbox10">
+                                                            <!-- n-columns=2 n-rows=3 -->
+                                                            <object class="GtkGrid">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
-                                                            <property name="orientation">vertical</property>
+                                                            <property name="column-spacing">4</property>
                                                             <child>
                                                             <object class="GtkCheckButton" id="thumbs_checkbutton">
                                                             <property name="label" translatable="yes">Show thumbnails</property>
@@ -1439,9 +1496,8 @@ Unless the author name is valid, this field is ignored.</property>
                                                             <signal name="toggled" handler="thumbs_checkbutton_toggled" swapped="no"/>
                                                             </object>
                                                             <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="position">0</property>
+                                                            <property name="left-attach">1</property>
+                                                            <property name="top-attach">0</property>
                                                             </packing>
                                                             </child>
                                                             <child>
@@ -1455,9 +1511,8 @@ Unless the author name is valid, this field is ignored.</property>
                                                             <signal name="toggled" handler="toggled_fullscreen" swapped="no"/>
                                                             </object>
                                                             <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="position">1</property>
+                                                            <property name="left-attach">1</property>
+                                                            <property name="top-attach">1</property>
                                                             </packing>
                                                             </child>
                                                             <child>
@@ -1471,9 +1526,8 @@ Unless the author name is valid, this field is ignored.</property>
                                                             <signal name="toggled" handler="toggled_audio_only" swapped="no"/>
                                                             </object>
                                                             <packing>
-                                                            <property name="expand">True</property>
-                                                            <property name="fill">True</property>
-                                                            <property name="position">2</property>
+                                                            <property name="left-attach">0</property>
+                                                            <property name="top-attach">0</property>
                                                             </packing>
                                                             </child>
                                                             <child>
@@ -1487,9 +1541,8 @@ Unless the author name is valid, this field is ignored.</property>
                                                             <signal name="toggled" handler="toggled_nsfw_support" swapped="no"/>
                                                             </object>
                                                             <packing>
-                                                            <property name="expand">False</property>
-                                                            <property name="fill">False</property>
-                                                            <property name="position">3</property>
+                                                            <property name="left-attach">0</property>
+                                                            <property name="top-attach">1</property>
                                                             </packing>
                                                             </child>
                                                             <child>
@@ -1503,10 +1556,12 @@ Unless the author name is valid, this field is ignored.</property>
                                                             <signal name="toggled" handler="toggled_clear_search_list" swapped="no"/>
                                                             </object>
                                                             <packing>
-                                                            <property name="expand">True</property>
-                                                            <property name="fill">True</property>
-                                                            <property name="position">4</property>
+                                                            <property name="left-attach">0</property>
+                                                            <property name="top-attach">2</property>
                                                             </packing>
+                                                            </child>
+                                                            <child>
+                                                            <placeholder/>
                                                             </child>
                                                             </object>
                                                             </child>
@@ -1516,6 +1571,7 @@ Unless the author name is valid, this field is ignored.</property>
                                                           <object class="GtkLabel" id="label4">
                                                             <property name="visible">True</property>
                                                             <property name="can-focus">False</property>
+                                                            <property name="xpad">4</property>
                                                             <property name="label" translatable="yes">&lt;b&gt;Other options:&lt;/b&gt;</property>
                                                             <property name="use-markup">True</property>
                                                           </object>
@@ -1533,6 +1589,8 @@ Unless the author name is valid, this field is ignored.</property>
                                                   <object class="GtkLabel" id="label32">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="xpad">4</property>
+                                                    <property name="ypad">4</property>
                                                     <property name="label" translatable="yes">More options</property>
                                                   </object>
                                                 </child>
@@ -1541,35 +1599,6 @@ Unless the author name is valid, this field is ignored.</property>
                                                 <property name="expand">False</property>
                                                 <property name="fill">False</property>
                                                 <property name="position">7</property>
-                                              </packing>
-                                            </child>
-                                            <child>
-                                              <object class="GtkButtonBox" id="hbuttonbox6">
-                                                <property name="visible">True</property>
-                                                <property name="can-focus">False</property>
-                                                <property name="homogeneous">True</property>
-                                                <property name="layout-style">center</property>
-                                                <child>
-                                                  <object class="GtkButton" id="button8">
-                                                    <property name="label">gtk-find</property>
-                                                    <property name="visible">True</property>
-                                                    <property name="can-focus">True</property>
-                                                    <property name="receives-default">True</property>
-                                                    <property name="use-stock">True</property>
-                                                    <signal name="clicked" handler="search" swapped="no"/>
-                                                  </object>
-                                                  <packing>
-                                                    <property name="expand">False</property>
-                                                    <property name="fill">False</property>
-                                                    <property name="position">0</property>
-                                                  </packing>
-                                                </child>
-                                              </object>
-                                              <packing>
-                                                <property name="expand">False</property>
-                                                <property name="fill">False</property>
-                                                <property name="padding">14</property>
-                                                <property name="position">8</property>
                                               </packing>
                                             </child>
                                             <child>
@@ -1582,7 +1611,9 @@ Unless the author name is valid, this field is ignored.</property>
                                                   <object class="GtkAlignment" id="alignment10">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
+                                                    <property name="top-padding">4</property>
                                                     <property name="left-padding">12</property>
+                                                    <property name="right-padding">12</property>
                                                     <child>
                                                       <object class="GtkComboBoxText" id="comboboxtext9">
                                                         <property name="visible">True</property>
@@ -1610,7 +1641,8 @@ When the specified resolution is not found, the best available resolution is use
                                                   <object class="GtkLabel" id="label18">
                                                     <property name="visible">True</property>
                                                     <property name="can-focus">False</property>
-                                                    <property name="label" translatable="yes">&lt;b&gt;Resolution&lt;/b&gt;</property>
+                                                    <property name="xpad">4</property>
+                                                    <property name="label" translatable="yes">&lt;b&gt;Resolution:&lt;/b&gt;</property>
                                                     <property name="use-markup">True</property>
                                                   </object>
                                                 </child>
@@ -1648,7 +1680,10 @@ When the specified resolution is not found, the best available resolution is use
                                   <object class="GtkBox" id="vbox8">
                                     <property name="visible">True</property>
                                     <property name="can-focus">False</property>
+                                    <property name="margin-top">4</property>
                                     <property name="orientation">vertical</property>
+                                    <property name="spacing">8</property>
+                                    <property name="baseline-position">top</property>
                                     <child>
                                       <object class="GtkFrame" id="frame4">
                                         <property name="visible">True</property>
@@ -1659,7 +1694,9 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkAlignment" id="alignment4">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="top-padding">4</property>
                                             <property name="left-padding">12</property>
+                                            <property name="right-padding">12</property>
                                             <child>
                                               <object class="GtkEntry" id="entry1">
                                                 <property name="visible">True</property>
@@ -1677,6 +1714,7 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkLabel" id="label9">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="xpad">4</property>
                                             <property name="label" translatable="yes">&lt;b&gt;Uploads:&lt;/b&gt;</property>
                                             <property name="use-markup">True</property>
                                           </object>
@@ -1685,7 +1723,6 @@ When the specified resolution is not found, the best available resolution is use
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
-                                        <property name="padding">3</property>
                                         <property name="position">0</property>
                                       </packing>
                                     </child>
@@ -1699,7 +1736,9 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkAlignment" id="alignment23">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="top-padding">4</property>
                                             <property name="left-padding">12</property>
+                                            <property name="right-padding">12</property>
                                             <child>
                                               <object class="GtkEntry" id="entry3">
                                                 <property name="visible">True</property>
@@ -1717,6 +1756,7 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkLabel" id="label30">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="xpad">4</property>
                                             <property name="label" translatable="yes">&lt;b&gt;Favorites:&lt;/b&gt;</property>
                                             <property name="use-markup">True</property>
                                           </object>
@@ -1725,7 +1765,6 @@ When the specified resolution is not found, the best available resolution is use
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
-                                        <property name="padding">3</property>
                                         <property name="position">1</property>
                                       </packing>
                                     </child>
@@ -1739,7 +1778,9 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkAlignment" id="alignment5">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="top-padding">4</property>
                                             <property name="left-padding">12</property>
+                                            <property name="right-padding">12</property>
                                             <child>
                                               <object class="GtkEntry" id="entry4">
                                                 <property name="visible">True</property>
@@ -1756,6 +1797,7 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkLabel" id="label34">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="xpad">4</property>
                                             <property name="label" translatable="yes">&lt;b&gt;Subscriptions:&lt;/b&gt;</property>
                                             <property name="use-markup">True</property>
                                           </object>
@@ -1777,7 +1819,9 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkAlignment" id="alignment27">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="top-padding">4</property>
                                             <property name="left-padding">12</property>
+                                            <property name="right-padding">12</property>
                                             <child>
                                               <object class="GtkEntry" id="entry5">
                                                 <property name="visible">True</property>
@@ -1794,6 +1838,7 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkLabel" id="label37">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="xpad">4</property>
                                             <property name="label" translatable="yes">&lt;b&gt;Likes:&lt;/b&gt;</property>
                                             <property name="use-markup">True</property>
                                           </object>
@@ -1815,7 +1860,9 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkAlignment" id="alignment2">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="top-padding">4</property>
                                             <property name="left-padding">12</property>
+                                            <property name="right-padding">12</property>
                                             <child>
                                               <object class="GtkEntry" id="entry2">
                                                 <property name="visible">True</property>
@@ -1833,6 +1880,7 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkLabel" id="label5">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="xpad">4</property>
                                             <property name="label" translatable="yes">&lt;b&gt;Playlists:&lt;/b&gt;</property>
                                             <property name="use-markup">True</property>
                                           </object>
@@ -1841,7 +1889,6 @@ When the specified resolution is not found, the best available resolution is use
                                       <packing>
                                         <property name="expand">False</property>
                                         <property name="fill">False</property>
-                                        <property name="padding">3</property>
                                         <property name="position">4</property>
                                       </packing>
                                     </child>
@@ -1856,7 +1903,9 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkAlignment" id="alignment26">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="top-padding">4</property>
                                             <property name="left-padding">12</property>
+                                            <property name="right-padding">12</property>
                                             <child>
                                               <object class="GtkComboBoxText" id="comboboxtext7">
                                                 <property name="visible">True</property>
@@ -1875,6 +1924,7 @@ When the specified resolution is not found, the best available resolution is use
                                           <object class="GtkLabel" id="label36">
                                             <property name="visible">True</property>
                                             <property name="can-focus">False</property>
+                                            <property name="xpad">4</property>
                                             <property name="label" translatable="yes">&lt;b&gt;Channel type:&lt;/b&gt;</property>
                                             <property name="use-markup">True</property>
                                           </object>
@@ -1907,6 +1957,7 @@ When the specified resolution is not found, the best available resolution is use
                                   <object class="GtkScrolledWindow" id="scrolledwindow8">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
+                                    <property name="margin-top">4</property>
                                     <child>
                                       <object class="GtkTreeView" id="treeview3">
                                         <property name="visible">True</property>
@@ -1970,6 +2021,7 @@ When the specified resolution is not found, the best available resolution is use
                                   <object class="GtkScrolledWindow" id="scrolledwindow7">
                                     <property name="visible">True</property>
                                     <property name="can-focus">True</property>
+                                    <property name="margin-top">4</property>
                                     <child>
                                       <object class="GtkViewport" id="viewport4">
                                         <property name="visible">True</property>

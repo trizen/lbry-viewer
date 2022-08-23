@@ -863,7 +863,7 @@ sub _extract_search_results {
             push @next_page,
               {
                 type  => 'nextpage',
-                token => sprintf('lbry:search:%s:%s', $type, $self->_fix_url_protocol($a->{'-href'}),),
+                token => sprintf('lbry:search:%s:%s', $type, $self->_fix_url_protocol($a->{'-href'}) // ''),
               };
         }
     }

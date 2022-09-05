@@ -1253,9 +1253,11 @@ sub next_page {
         $url = $self->_append_url_args($url, page => 2);
     }
 
-    my $res = $self->_get_results($url);
-    $res->{url} = $url;
-    return $res;
+    return $self->lbry_search_from_url($url, type => 'video');
+
+    #~ my $res = $self->_get_results($url);
+    #~ $res->{url} = $url;
+    #~ return $res;
 }
 
 # SUBROUTINE FACTORY

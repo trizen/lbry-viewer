@@ -232,7 +232,6 @@ my %CONFIG = (
     prefer_m4a         => 0,
     prefer_av1         => 0,
     ignore_av1         => 0,
-    prefer_invidious   => 0,
     force_fallback     => 0,
     fat32safe          => $constant{win32},
     fullscreen         => 0,
@@ -831,8 +830,8 @@ usage: $execname [options] ([url] | [keywords])
     --custom-playlist-layout=s : custom layout format for playlists
 
  * Other
-   --api=s              : set an API host from https://api.invidious.io/
-   --api=auto           : use a random instance of invidious
+   --api=s              : set an API host from codeberg.org/librarian/librarian
+   --api=auto           : use a random Librarian instance
    --nsfw!              : show NSFW videos in search results
    --cookies=s          : file to read cookies from and dump cookie
    --user-agent=s       : specify a custom user agent
@@ -840,8 +839,7 @@ usage: $execname [options] ([url] | [keywords])
                           If authentication is required,
                           use 'proto://user:pass\@domain.tld:port/'
    --split-videos!      : include or exclude the itags for split videos
-   --ytdl!              : use youtube-dl for videos with encrypted signatures
-                          `--no-ytdl` will use invidious instances
+   --ytdl!              : use youtube-dl for extracting streaming URLs
    --ytdl-cmd=s         : yt-dlp / youtube-dl command (default: $CONFIG{ytdl_cmd})
 
 Help options:
@@ -1130,7 +1128,7 @@ sub apply_configuration {
                              http_proxy page comments_order
                              user_agent force_fallback
                              cookie_file timeout ytdl ytdl_cmd
-                             prefer_mp4 prefer_av1 prefer_invidious
+                             prefer_mp4 prefer_av1
                              ytdlp_comments ytdlp_max_comments
                              ytdlp_max_replies
                              bypass_age_gate_with_proxy nsfw
@@ -1206,16 +1204,6 @@ sub apply_configuration {
 
     if (defined $opt->{favorite_video}) {
         favorite_videos(split(/[,\s]+/, delete $opt->{favorite_video}));
-    }
-
-    if (defined $opt->{playlist_save}) {
-        my @ids = split(/[,\s]+/, delete $opt->{playlist_save});
-        if (defined $opt->{playlist_id}) {
-            save_to_playlist(get_valid_playlist_id(delete $opt->{playlist_id}) // (return), @ids);
-        }
-        else {
-            select_and_save_to_playlist(@ids);
-        }
     }
 
     if (defined $opt->{like_video}) {
@@ -1528,8 +1516,7 @@ sub parse_arguments {
         'prefer-av1!' => \$opt{prefer_av1},
         'ignore-av1!' => \$opt{ignore_av1},
 
-        'invidious|prefer-invidious!' => \$opt{prefer_invidious},
-        'fallback|force-fallback!'    => \$opt{force_fallback},
+        'fallback|force-fallback!' => \$opt{force_fallback},
 
         'custom-layout-format=s'          => \$opt{custom_layout_format},
         'custom-channel-layout-format=s'  => \$opt{custom_channel_layout_format},
@@ -1874,14 +1861,6 @@ sub get_user_input {
     return @{$keywords};
 }
 
-sub authenticated {
-    if (not defined $yv_obj->get_access_token) {
-        warn_needs_auth();
-        return;
-    }
-    return 1;
-}
-
 sub favorite_videos {
     my (@videos) = @_;
 
@@ -1889,54 +1868,6 @@ sub favorite_videos {
         prepend_video_data_to_file($video_data, $favorite_videos_data_file);
     }
 
-    return 1;
-}
-
-sub select_and_save_to_playlist {
-    return if not authenticated();
-
-    my $request    = $yv_obj->my_playlists() // return;
-    my $playlistID = print_playlists($request, return_playlist_id => 1);
-
-    if (defined($playlistID)) {
-        return save_to_playlist($playlistID, @_);
-    }
-
-    warn_no_thing_selected('playlist');
-    return;
-
-}
-
-sub save_to_playlist {
-    my ($playlistID, @videoIDs) = @_;
-
-    return if not authenticated();
-
-    foreach my $id (@videoIDs) {
-
-        my $videoID = get_valid_video_id($id) // next;
-        my $pos     = $opt{position};                    # position in the playlist
-
-        if (!defined($pos) or $pos < 0) {
-            local $yv_obj->{maxResults} = 1;
-
-            my $info          = $yv_obj->videos_from_playlist_id($playlistID);
-            my $total_results = $info->{results}{pageInfo}{totalResults};
-
-            say "\n:: Total number of videos in the playlist: $total_results";
-            $pos //= 0;
-            $pos += $total_results || 0;
-            say ":: Saving video at position: $pos";
-        }
-
-        if ($yv_obj->add_video_to_playlist($playlistID, $videoID, $pos)) {
-            printf(":: Video %s has been successfully added to playlistID: %s\n",
-                   sprintf($CONFIG{lbry_video_url}, $videoID), $playlistID);
-        }
-        else {
-            warn_cant_do("add to playlist", $videoID);
-        }
-    }
     return 1;
 }
 
@@ -2651,27 +2582,6 @@ sub print_comments {
             elsif ($opt =~ /^(?:h|help)\z/) {
                 print $comments_help;
                 press_enter_to_continue();
-            }
-            elsif ($opt =~ /^(?:c|comment)\z/) {
-                if (authenticated()) {
-                    require File::Temp;
-                    my ($fh, $filename) = File::Temp::tempfile();
-                    $yv_obj->proxy_system($ENV{EDITOR} // 'nano', $filename);
-                    if ($?) {
-                        warn colored("\n[!] Editor exited with a non-zero code. Unable to continue!", 'bold red') . "\n";
-                    }
-                    else {
-                        my $comment = do { local (@ARGV, $/) = $filename; <> };
-                        $comment =~ s/[^\s[:^cntrl:]]+//g;    # remove control characters
-
-                        if (length($comment) and $yv_obj->comment_to_video_id($comment, $videoID)) {
-                            print "\n:: Comment posted!\n";
-                        }
-                        else {
-                            warn colored("\n[!] Your comment has NOT been posted!", 'bold red') . "\n";
-                        }
-                    }
-                }
             }
             elsif ($opt =~ /^(?:r|return)\z/) {
                 return;
@@ -4368,9 +4278,12 @@ main_quit(0);
 
 Hostname of Librarian instance. When set to C<"auto">, a random Librarian instance is selected.
 
-List of public invidious instances:
+List of public Librarian instances:
 
     https://codeberg.org/librarian/librarian#clearnet
+    https://codeberg.org/librarian/librarian#tor
+
+Tor instances are also supported if the C<socks5://127.0.0.1:9050> Tor proxy is available and the Perl module L<LWP::Protocol::socks> is installed.
 
 =head2 auto_captions
 
@@ -4497,7 +4410,7 @@ Path to the C<ffmpeg> program.
 
 =head2 force_fallback
 
-Force the extraction of the streaming URLs to always use the fallback method (youtube-dl / invidious).
+Force the extraction of the streaming URLs to always use the fallback method (youtube-dl).
 
 =head2 fullscreen
 
@@ -4637,10 +4550,6 @@ Prefer audio streams in M4A (AAC) format.
 
 By default, the OPUS format for audio is preferred.
 
-=head2 prefer_invidious
-
-Prefer invidious instances over parsing the LBRY website directly.
-
 =head2 region
 
 ISO 3166 country code (default: "US").
@@ -4772,21 +4681,15 @@ Format for C<sprintf()> for constructing an LBRY video URL given the video ID.
 
 =head2 ytdl
 
-Use C<youtube-dl> for videos with encrypted signatures.
-
-When set to C<0>, invidious instances will be used instead.
+Use C<youtube-dl> for extracting the streaming URLs.
 
 =head2 ytdl_cmd
 
 Command for C<yt-dlp> or C<youtube-dl> when C<ytdl> is set to C<1>.
 
-Also command for C<yt-dlp> for extracting LBRY comments when C<ytdlp_comments> is set to C<1>.
-
 =head2 ytdlp_comments
 
 When set to C<1>, use C<yt-dlp> for extracting LBRY comments. (experimental)
-
-When set to C<0>, invidious instances will be used instead.
 
 =head2 ytdlp_max_comments
 

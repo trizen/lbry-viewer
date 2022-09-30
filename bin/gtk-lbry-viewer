@@ -205,24 +205,23 @@ my %CONFIG = (
     hpaned_position             => 420,
 
     # LBRY options
-    split_videos     => 1,
-    prefer_mp4       => 0,
-    prefer_av1       => 0,
-    ignore_av1       => 0,
-    prefer_m4a       => 0,
-    prefer_invidious => 0,
-    force_fallback   => 0,
-    maxResults       => 10,
-    hfr              => 1,        # true to prefer high frame rate (HFR) videos
-    resolution       => 'best',
+    split_videos   => 1,
+    prefer_mp4     => 0,
+    prefer_av1     => 0,
+    ignore_av1     => 0,
+    prefer_m4a     => 0,
+    force_fallback => 0,
+    maxResults     => 10,
+    hfr            => 1,        # true to prefer high frame rate (HFR) videos
+    resolution     => 'best',
 
     videoDimension => undef,
     videoLicense   => undef,
     region         => undef,
     nsfw           => 0,
 
-    comments_width => 80,         # wrap comments longer than `n` characters
-    comments_order => 'top',      # valid values: time, relevance
+    comments_width => 80,       # wrap comments longer than `n` characters
+    comments_order => 'top',    # valid values: time, relevance
 
     # API
     api_host => "auto",
@@ -892,14 +891,7 @@ my $yv_obj = WWW::LbryViewer->new(
                                   timeout     => $CONFIG{timeout},
                                  );
 
-#$yv_obj->load_authentication_tokens();
-
-if (defined $yv_obj->get_access_token()) {
-    show_user_panel();
-}
-else {
-    $statusbar->push(1, 'Not logged in.');
-}
+$statusbar->push(1, 'GTK LBRY Viewer' . ' ' . $WWW::LbryViewer::VERSION);
 
 require WWW::LbryViewer::Utils;
 
@@ -939,7 +931,7 @@ sub apply_configuration {
                              region debug http_proxy user_agent
                              timeout cookie_file ytdl ytdl_cmd
                              api_host prefer_mp4 prefer_av1
-                             comments_order prefer_invidious
+                             comments_order
                              force_fallback ytdlp_comments
                              ytdlp_max_comments ytdlp_max_replies
                              bypass_age_gate_with_proxy nsfw
@@ -2299,9 +2291,10 @@ sub playlists_button {
 }
 
 sub activity_button {
-    my $type     = $panel_account_type_combobox->get_active_text;
-    my $username = $panel_user_entry->get_text;
-    activities($type, $username);
+
+    #~ my $type     = $panel_account_type_combobox->get_active_text;
+    #~ my $username = $panel_user_entry->get_text;
+    #~ activities($type, $username);
 }
 
 sub popular_uploads {
@@ -2323,7 +2316,7 @@ sub popular_uploads {
 
 {
     no strict 'refs';
-    foreach my $name (qw(favorites uploads likes dislikes playlists subscriptions activities)) {
+    foreach my $name (qw(favorites uploads playlists)) {
         *{__PACKAGE__ . '::' . $name} = sub {
             my ($type, $channel) = @_;
 
@@ -2337,24 +2330,6 @@ sub popular_uploads {
             }
             elsif ($type =~ /^channel/i and $channel ne 'mine' and $channel =~ /^\S+\z/) {
                 $method = $name . '_from_username';
-            }
-
-            if ($type =~ /^(mine|myself)/i) {
-                if ($name eq 'likes') {
-                    $method = 'my_likes';
-                }
-
-                if ($name eq 'playlists') {
-                    $method = 'my_playlists';
-                }
-
-                if ($name eq 'activities') {
-                    $method = 'my_activities';
-                }
-            }
-
-            if ($name eq 'dislikes') {
-                $method = 'my_dislikes';
             }
 
             my $request = $yv_obj->$method(
@@ -2941,7 +2916,7 @@ sub display_results {
     }
 
     if (ref($items) ne 'ARRAY') {
-        die "Probably the selected invidious instance is down.\n"
+        die "Probably the selected Librarian instance is down.\n"
           . "\nTry changing the `api_host` in configuration file:\n\n"
           . qq{\tapi_host => "auto",\n}
           . qq{\nSee also: https://github.com/trizen/lbry-viewer#librarian-instances\n};

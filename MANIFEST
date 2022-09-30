@@ -3,11 +3,9 @@ bin/lbry-viewer
 Build.PL
 Changes
 lib/WWW/LbryViewer.pm
-lib/WWW/LbryViewer/Activities.pm
 lib/WWW/LbryViewer/Channels.pm
 lib/WWW/LbryViewer/CommentThreads.pm
 lib/WWW/LbryViewer/GetCaption.pm
-lib/WWW/LbryViewer/GuideCategories.pm
 lib/WWW/LbryViewer/Itags.pm
 lib/WWW/LbryViewer/Librarian.pm
 lib/WWW/LbryViewer/ParseJSON.pm
@@ -16,7 +14,6 @@ lib/WWW/LbryViewer/PlaylistItems.pm
 lib/WWW/LbryViewer/Playlists.pm
 lib/WWW/LbryViewer/RegularExpressions.pm
 lib/WWW/LbryViewer/Search.pm
-lib/WWW/LbryViewer/Subscriptions.pm
 lib/WWW/LbryViewer/Utils.pm
 lib/WWW/LbryViewer/VideoCategories.pm
 lib/WWW/LbryViewer/Videos.pm

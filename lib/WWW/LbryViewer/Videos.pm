@@ -68,30 +68,6 @@ sub trending_videos_from_category {
     return $self->_get_results($self->_make_feed_url('trending', (defined($category) ? (type => $category) : ())));
 }
 
-=head2 my_likes()
-
-Get the videos liked by the authenticated user.
-
-=cut
-
-sub my_likes {
-    my ($self) = @_;
-    $self->get_access_token() // return;
-    $self->_get_results($self->_make_videos_url(myRating => 'like', pageToken => $self->page_token));
-}
-
-=head2 my_dislikes()
-
-Get the videos disliked by the authenticated user.
-
-=cut
-
-sub my_dislikes {
-    my ($self) = @_;
-    $self->get_access_token() // return;
-    $self->_get_results($self->_make_videos_url(myRating => 'dislike', pageToken => $self->page_token));
-}
-
 =head2 send_rating_to_video($videoID, $rating)
 
 Send rating to a video. $rating can be either 'like' or 'dislike'.
@@ -129,37 +105,6 @@ Dislike a video. Returns true on success.
 sub dislike_video {
     my ($self, $video_id) = @_;
     $self->send_rating_to_video($video_id, 'dislike');
-}
-
-=head2 videos_details($id, $part)
-
-Get info about a videoID, such as: channelId, title, description,
-tags, and categoryId.
-
-Available values for I<part> are: I<id>, I<snippet>, I<contentDetails>
-I<player>, I<statistics>, I<status> and I<topicDetails>.
-
-C<$part> string can contain more values, comma-separated.
-
-Example:
-
-    part => 'snippet,contentDetails,statistics'
-
-When C<$part> is C<undef>, it defaults to I<snippet>.
-
-=cut
-
-sub _invidious_video_details {
-    my ($self, $id, $fields) = @_;
-
-    $fields //= $self->basic_video_info_fields;
-    my $info = $self->_get_results($self->_make_feed_url("videos/$id", fields => $fields))->{results};
-
-    if (ref($info) eq 'HASH' and exists $info->{videoId} and exists $info->{title}) {
-        return $info;
-    }
-
-    return;
 }
 
 sub _ytdl_video_details {
@@ -209,7 +154,7 @@ sub _fallback_video_details {
         };
     }
     else {
-        #$info = $self->_invidious_video_details($id, $fields);     # too slow
+        ## TODO: extract video info from the Librarian website.
     }
 
     return {};

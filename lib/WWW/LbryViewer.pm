@@ -22,8 +22,6 @@ use parent qw(
   WWW::LbryViewer::Channels
   WWW::LbryViewer::Playlists
   WWW::LbryViewer::ParseJSON
-  WWW::LbryViewer::Activities
-  WWW::LbryViewer::Subscriptions
   WWW::LbryViewer::PlaylistItems
   WWW::LbryViewer::CommentThreads
   WWW::LbryViewer::VideoCategories
@@ -95,20 +93,10 @@ my %valid_options = (
     escape_utf8                => {valid => [1, 0], default => 0},
     prefer_mp4                 => {valid => [1, 0], default => 0},
     prefer_av1                 => {valid => [1, 0], default => 0},
-    prefer_invidious           => {valid => [1, 0], default => 0},
     force_fallback             => {valid => [1, 0], default => 0},
     bypass_age_gate_with_proxy => {valid => [1, 0], default => 0},
 
-    # API/OAuth
-    key           => {valid => qr/^.{15}/, default => undef},
-    client_id     => {valid => qr/^.{15}/, default => undef},
-    client_secret => {valid => qr/^.{15}/, default => undef},
-    redirect_uri  => {valid => qr/^.{15}/, default => undef},
-    access_token  => {valid => qr/^.{15}/, default => undef},
-    refresh_token => {valid => qr/^.{15}/, default => undef},
-
-    authentication_file => {valid => qr/^./, default => undef},
-    api_host            => {valid => qr/\w/, default => "auto"},
+    api_host => {valid => qr/\w/, default => "auto"},
 
     #librarian_url => {valid => qr/\w/, default => 'https://lbry.bcow.xyz'},
     #librarian_url => {valid => qr/\w/, default => 'https://lbry.vern.cc'},
@@ -298,8 +286,8 @@ sub set_lwp_useragent {
                  # don't cache if "cache-control" specifies "max-age=0", "no-store" or "no-cache"
                  or (($response->header('cache-control') // '') =~ /\b(?:max-age=0|no-store|no-cache)\b/)
 
-                 # don't cache video or audio files
-                 or (($response->header('content-type') // '') =~ /\b(?:video|audio)\b/);
+                 # don't cache media content
+                 or (($response->header('content-type') // '') =~ /\b(?:audio|image|video)\b/);
            },
 
            recache_if => sub {
@@ -365,33 +353,6 @@ sub set_lwp_useragent {
     return $agent;
 }
 
-=head2 prepare_access_token()
-
-Returns a string. used as header, with the access token.
-
-=cut
-
-sub prepare_access_token {
-    my ($self) = @_;
-
-    if (defined(my $auth = $self->get_access_token)) {
-        return "Bearer $auth";
-    }
-
-    return;
-}
-
-sub _auth_lwp_header {
-    my ($self) = @_;
-
-    my %lwp_header;
-    if (defined $self->get_access_token) {
-        $lwp_header{'Authorization'} = $self->prepare_access_token;
-    }
-
-    return %lwp_header;
-}
-
 sub _warn_reponse_error {
     my ($resp, $url) = @_;
     warn sprintf("[%s] Error occurred on URL: %s\n", $resp->status_line, $url);
@@ -420,8 +381,6 @@ sub lwp_get {
         $url = 'https:' . $url;
     }
 
-    my %lwp_header = ($opt{simple} ? () : $self->_auth_lwp_header);
-
     if ($url !~ /^https?:/) {    # maybe it's base64 encoded?
 
         if ($self->get_debug) {
@@ -444,13 +403,13 @@ sub lwp_get {
                 else {
                     say ":: Setting proxy for onion websites..." if $self->get_debug;
                     $self->{lwp}->proxy(['http', 'https'], 'socks://localhost:9050');
-                    $r = $self->{lwp}->get($url, %lwp_header);
+                    $r = $self->{lwp}->get($url);
                     $self->{lwp}->proxy(['http', 'https'], undef);
                 }
             }
         }
 
-        $r // $self->{lwp}->get($url, %lwp_header);
+        $r // $self->{lwp}->get($url);
     };
 
     if ($response->is_success) {
@@ -467,9 +426,7 @@ sub lwp_get {
     }
 
     # Too many errors. Pick another Librarian instance.
-    if ($url !~ m{(?:\byoutube\.com/|\bi\.ytimg\.com/)}) {
-        ## TODO
-    }
+    # $self->pick_and_set_random_instance();
 
     _warn_reponse_error($response, $url);
     return;
@@ -538,7 +495,7 @@ sub _append_url_args {
       : $url;
 }
 
-sub get_invidious_instances {
+sub get_librarian_instances {
     my ($self) = @_;
 
     require File::Spec;
@@ -551,54 +508,162 @@ sub get_invidious_instances {
 
         my $lwp = LWP::UserAgent->new(timeout => $self->get_timeout);
         $lwp->show_progress(1) if $self->get_debug;
-        my $resp = $lwp->get("https://api.invidious.io/instances.json");
+        my $resp = $lwp->get("https://codeberg.org/librarian/librarian/raw/branch/main/instances.json");
 
         $resp->is_success() or return;
 
         my $json = $resp->decoded_content() || return;
-        open(my $fh, '>', $instances_file) or return;
+        open(my $fh, '>:utf8', $instances_file) or return;
         print $fh $json;
         close $fh;
     }
 
-    open(my $fh, '<', $instances_file) or return;
+    open(my $fh, '<:utf8', $instances_file) or return;
 
     my $json_string = do {
         local $/;
         <$fh>;
     };
 
-    $self->parse_json_string($json_string);
+    my $result = $self->parse_utf8_json_string($json_string);
+
+    if (ref($result) ne 'HASH' or ref($result->{instances}) ne 'ARRAY' or not @{$result->{instances}}) {
+
+        if ($self->get_debug) {
+            say STDERR "[!] Could not fetch the list of Librarian instances...\n";
+        }
+
+        return [
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1E8}\x{1F1E6}\x{FE0F} CA, \x{1F1F3}\x{1F1F1} NL",
+                 live       => 1,
+                 name       => "lbry.bcow.xyz",
+                 url        => "https://lbry.bcow.xyz",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1EF}\x{1F1F5} JP",
+                 live       => 1,
+                 name       => "odysee.076.ne.jp",
+                 url        => "https://odysee.076.ne.jp",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1E9}\x{1F1EA} DE",
+                 live       => 1,
+                 name       => "librarian.pussthecat.org",
+                 url        => "https://librarian.pussthecat.org",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1EB}\x{1F1F7} FR",
+                 live       => 1,
+                 name       => "lbry.projectsegfau.lt",
+                 url        => "https://lbry.projectsegfau.lt",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1E8}\x{1F1E6} CA",
+                 live       => 0,
+                 name       => "librarian.esmailelbob.xyz",
+                 url        => "https://librarian.esmailelbob.xyz",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1E8}\x{1F1E6} CA",
+                 live       => 0,
+                 name       => "lbry.vern.cc",
+                 url        => "https://lbry.vern.cc",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1FA}\x{1F1F8} US",
+                 live       => 0,
+                 name       => "lbry.slipfox.xyz",
+                 url        => "https://lbry.slipfox.xyz",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1F2}\x{1F1E9} MD",
+                 live       => 0,
+                 name       => "lbry.sytes.net",
+                 url        => "https://lbry.sytes.net",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1E8}\x{1F1FF} CZ",
+                 live       => 1,
+                 name       => "lbry.webhop.me",
+                 url        => "https://lbry.webhop.me",
+                },
+                {
+                 cloudflare => 0,
+                 country    => "\x{1F1F7}\x{1F1FA} RU",
+                 live       => 0,
+                 name       => "lbry.mywire.org",
+                 url        => "https://lbry.mywire.org",
+                },
+               ];
+    }
+
+    return $result->{instances};
 }
 
-sub get_librarian_instances {
+sub select_good_librarian_instances {
     my ($self, %args) = @_;
 
-    my @instances = qw(
-      lbry.bcow.xyz
-      librarian.pussthecat.org
-      lbry.mutahar.rocks
-      librarian.esmailelbob.xyz
-      lbry.vern.cc
-    );
+    state $instances = $self->get_librarian_instances();
 
-    return @instances;
+    ref($instances) eq 'ARRAY' or return;
+
+    my %ignored = (
+        'lbry.bcow.xyz'            => 1,    # Data collected
+        'librarian.pussthecat.org' => 1,    # Data collected
+        'lbry.webhop.me'           => 1,    # search doesn't work
+                  );
+
+#<<<
+    my @candidates =
+      grep { not $ignored{$_->{name}} }
+      grep { $_->{name} !~ /\.onion\z/ }
+      grep { $args{lax} ? 1 : (not $_->{cloudflare}) }
+      #grep { $args{lax} ? 1 : ($_->{live}) }
+      grep { $_->{url} =~ m{^https://} }
+      @$instances;
+#>>>
+
+    if ($self->get_debug) {
+
+        my @hosts = map { $_->{name} } @candidates;
+        my $count = scalar(@candidates);
+
+        print STDERR ":: Found $count librarian instances: @hosts\n";
+    }
+
+    return @candidates;
 }
 
 sub _find_working_instance {
-    my ($self, $candidates) = @_;
+    my ($self, $candidates, $extra_candidates) = @_;
 
     require List::Util;
     state $yv_utils = WWW::LbryViewer::Utils->new();
 
-    foreach my $instance (List::Util::shuffle(@$candidates)) {
+    my %seen;
 
-        my $uri = "https://$instance";
+    foreach my $instance (List::Util::shuffle(@$candidates), List::Util::shuffle(@$extra_candidates)) {
+
+        ref($instance) eq 'HASH' or next;
+
+        my $uri = $instance->{url} // next;
+        next if $seen{$uri}++;
+
         local $self->{api_host} = $uri;
         my $results = $self->search_videos('test');
 
         if ($yv_utils->has_entries($results)) {
-            return $uri;
+            return $instance;
         }
     }
 
@@ -608,10 +673,15 @@ sub _find_working_instance {
 sub pick_random_instance {
     my ($self) = @_;
 
-    my @candidates = $self->get_librarian_instances();
+    my @candidates       = $self->select_good_librarian_instances();
+    my @extra_candidates = $self->select_good_librarian_instances(lax => 1);
 
-    if (defined(my $instance = $self->_find_working_instance(\@candidates))) {
+    if (defined(my $instance = $self->_find_working_instance(\@candidates, \@extra_candidates))) {
         return $instance;
+    }
+
+    if (not @candidates) {
+        @candidates = @extra_candidates;
     }
 
     $candidates[rand @candidates];
@@ -620,20 +690,11 @@ sub pick_random_instance {
 sub pick_and_set_random_instance {
     my ($self) = @_;
 
-    # For now, pick the official one, as it is more likely to work
-    return $self->set_api_host("https://lbry.bcow.xyz");
+    my $instance = $self->pick_random_instance() // return;
 
-    # Get the list of invidious instances
-    # my @instances = $self->get_librarian_instances();
-
-    # Select a random instance
-    #my $instance = $instances[rand @instances];
-
-    #my $instance = $instances[0];
-    my $instance = $self->pick_random_instance();
-
-    # Set the instance
-    $self->set_api_host($instance);
+    ref($instance) eq 'HASH' or return;
+    my $uri = $instance->{url} // return;
+    $self->set_api_host($uri);
 }
 
 sub get_librarian_url {
@@ -677,7 +738,7 @@ sub get_librarian_url {
 
 sub _simple_feeds_url {
     my ($self, $path, %args) = @_;
-    $self->get_api_url . $path . '?' . $self->list_to_url_arguments(key => $self->get_key, %args);
+    $self->get_librarian_url() . $path . '?' . $self->list_to_url_arguments(%args);
 }
 
 =head2 default_arguments(%args)
@@ -691,7 +752,6 @@ sub default_arguments {
 
     my %defaults = (
 
-        #key         => $self->get_key,
         #part        => 'snippet',
         #prettyPrint => 'false',
         #maxResults  => $self->get_maxResults,
@@ -705,7 +765,7 @@ sub _make_feed_url {
     my ($self, $path, %args) = @_;
 
     my $extra_args = $self->default_arguments(%args);
-    my $url        = $self->get_api_url . $path;
+    my $url        = $self->get_librarian_url() . $path;
 
     if ($extra_args) {
         $url .= '?' . $extra_args;
@@ -1158,13 +1218,7 @@ sub _request {
 
 sub _prepare_request {
     my ($self, $req, $length) = @_;
-
     $req->header('Content-Length' => $length) if ($length);
-
-    if (defined $self->get_access_token) {
-        $req->header('Authorization' => $self->prepare_access_token);
-    }
-
     return 1;
 }
 

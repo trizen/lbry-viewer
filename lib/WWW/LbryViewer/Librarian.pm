@@ -128,7 +128,7 @@ sub _fix_url_protocol {
     }
 
     if ($url =~ m{^/}) {
-        return $self->get_librarian_url . $url;
+        return $self->get_librarian_url() . $url;
     }
 
     return $url;
@@ -727,13 +727,13 @@ sub _extract_search_results {
         }
 
         #~ if (exists $entry->{'-class'} and $entry->{'-class'} eq 'pageSelector') {
-            #~ my $a    = $entry->{'a'}[-1];
-            #~ my $type = $args{type} // 'video';
-            #~ push @next_page,
-              #~ {
-                #~ type  => 'nextpage',
-                #~ token => sprintf('lbry:search:%s:%s', $type, $self->_fix_url_protocol($a->{'-href'}) // ''),
-              #~ };
+        #~ my $a    = $entry->{'a'}[-1];
+        #~ my $type = $args{type} // 'video';
+        #~ push @next_page,
+        #~ {
+        #~ type  => 'nextpage',
+        #~ token => sprintf('lbry:search:%s:%s', $type, $self->_fix_url_protocol($a->{'-href'}) // ''),
+        #~ };
         #~ }
     }
 

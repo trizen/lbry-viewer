@@ -258,31 +258,15 @@ sub has_entries {
 
     $result // return 0;
 
+    ref($result) eq 'HASH' or return;
+
     if (ref($result->{results}) eq 'HASH') {
-
-        foreach my $type (qw(comments videos playlists entries)) {
-            if (exists $result->{results}{$type}) {
-                ref($result->{results}{$type}) eq 'ARRAY' or return 0;
-                return (@{$result->{results}{$type}} > 0);
-            }
-        }
-
-        my $type = $result->{results}{type} // '';
-
-        if ($type eq 'playlist') {
-            return ($result->{results}{videoCount} > 0);
-        }
+        ref($result->{results}{entries}) eq 'ARRAY' or return;
+        return (scalar(@{$result->{results}{entries}}) > 0);
     }
 
-    if (ref($result->{results}) eq 'ARRAY') {
-        return (@{$result->{results}} > 0);
-    }
-
-    if (ref($result->{results}) eq 'HASH' and not keys %{$result->{results}}) {
-        return 0;
-    }
-
-    return 1;    # maybe?
+    ref($result->{results}) eq 'ARRAY' or return;
+    return (scalar(@{$result->{results}}) > 0);
 }
 
 =head2 normalize_filename($title, $fat32safe)

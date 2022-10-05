@@ -5,6 +5,13 @@
 
 [CHANGELOG]
 
+Version 0.0.5
+
+- Added support for `api_host => "auto"` to use a random Librarian instance.
+- Support for UTF-8 characters inside the config files.
+- Fixed the support for next pages.
+- GUI: tweak the interface to be less cramped.
+
 Version 0.0.4
 
 - Recognize several more video formats.

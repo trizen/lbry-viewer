@@ -57,15 +57,11 @@ Get popular videos from a category ID.
 sub trending_videos_from_category {
     my ($self, $category) = @_;
 
-    if (defined($category) and $category eq 'popular') {
+    if (defined($category) and $category eq 'featured') {
         return $self->popular_videos;
     }
 
-    if (defined($category) and $category eq 'trending') {
-        $category = undef;
-    }
-
-    return $self->_get_results($self->_make_feed_url('trending', (defined($category) ? (type => $category) : ())));
+    return $self->lbry_category_videos($category);
 }
 
 =head2 send_rating_to_video($videoID, $rating)

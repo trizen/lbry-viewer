@@ -27,12 +27,20 @@ Return video categories for a specific region ID.
 sub video_categories {
     my ($self) = @_;
 
-    return [{id => "music",    title => "Music"},
-            {id => "gaming",   title => "Gaming"},
-            {id => "news",     title => "News"},
-            {id => "movies",   title => "Movies"},
-            {id => "trending", title => "Trending"},
-            {id => "popular",  title => "Popular"},
+    return [{id => "featured",     title => "Featured"},
+            {id => "popculture",   title => "Pop Culture"},
+            {id => "artists",      title => "Artists"},
+            {id => "education",    title => "Education"},
+            {id => "comedy",       title => "Comedy"},
+            {id => "lifestyle",    title => "Lifestyle"},
+            {id => "music",        title => "Music"},
+            {id => "sports",       title => "Sports"},
+            {id => "gaming",       title => "Gaming"},
+            {id => "tech",         title => "Tech"},
+            {id => "universe",     title => "Universe"},
+            {id => "finance",      title => "Finance 2.0"},
+            {id => "spirituality", title => "Spirituality"},
+            {id => "news",         title => "News & Politics"},
            ];
 }
 

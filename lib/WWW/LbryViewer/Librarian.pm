@@ -145,34 +145,6 @@ sub _unscramble {
     return $str;
 }
 
-sub _extract_youtube_mix {
-    my ($self, $data) = @_;
-
-    my $info   = eval { $data->{callToAction}{watchCardHeroVideoRenderer} } || return;
-    my $header = eval { $data->{header}{watchCardRichHeaderRenderer} };
-
-    my %mix;
-
-    $mix{type} = 'playlist';
-
-    $mix{title} =
-      eval    { $header->{title}{runs}[0]{text} }
-      // eval { $info->{accessibility}{accessibilityData}{label} }
-      // eval { $info->{callToActionButton}{callToActionButtonRenderer}{label}{runs}[0]{text} } // 'Youtube Mix';
-
-    $mix{playlistId} = eval { $info->{navigationEndpoint}{watchEndpoint}{playlistId} } || return;
-
-    $mix{playlistThumbnail} = eval { $self->_fix_url_protocol($header->{avatar}{thumbnails}[0]{url}) }
-      // eval { $self->_fix_url_protocol($info->{heroImage}{collageHeroImageRenderer}{leftThumbnail}{thumbnails}[0]{url}) };
-
-    $mix{description} = _extract_description({title => $info});
-
-    $mix{author}   = eval { $header->{title}{runs}[0]{text} }                              // "YouTube";
-    $mix{authorId} = eval { $header->{titleNavigationEndpoint}{browseEndpoint}{browseId} } // "youtube";
-
-    return \%mix;
-}
-
 sub _extract_author_name {
     my ($info) = @_;
     eval { $info->{longBylineText}{runs}[0]{text} } // eval { $info->{shortBylineText}{runs}[0]{text} };
@@ -504,16 +476,6 @@ sub _extract_sectionList_results {
             next;
         }
 
-        # YouTube Mix
-        if ($args{type} eq 'all' and exists $entry->{universalWatchCardRenderer}) {
-
-            my $mix = $self->_extract_youtube_mix($entry->{universalWatchCardRenderer});
-
-            if (defined($mix)) {
-                push(@results, $mix);
-            }
-        }
-
         # Video results
         if (exists $entry->{itemSectionRenderer}) {
             my $res = $entry->{itemSectionRenderer};
@@ -715,6 +677,15 @@ sub _extract_search_results {
     my $body    = $hash->{html}[0]{body};
     my $results = $body->[0]{div};
 
+    ref($results) eq 'ARRAY' or return;
+
+    # Extract video results from a category
+    if (eval { ($results->[0]{'-class'} // '') eq 'categoryBar' }) {
+        shift @$results;
+        $results = eval { $results->[0]{div} };
+        ref($results) eq 'ARRAY' or return;
+    }
+
     my @videos;
     my @next_page;
 
@@ -800,6 +771,22 @@ sub lbry_search_from_url {
     my $hash    = $self->_get_librarian_data($url, %args) // return;
     my @results = $self->_extract_search_results($hash, %args);
 
+    $self->_prepare_results_for_return(\@results, %args, url => $url);
+}
+
+=head2 lbry_category_videos($category_id, %args)
+
+Returns videos from a given category ID.
+
+=cut
+
+sub lbry_category_videos {
+    my ($self, $category_id, %args) = @_;
+
+    my $url  = $self->_make_feed_url(defined($category_id) ? ('/$/' . $category_id) : '');
+    my $hash = $self->_get_librarian_data($url, %args) // return;
+
+    my @results = $self->_extract_search_results($hash, %args);
     $self->_prepare_results_for_return(\@results, %args, url => $url);
 }
 

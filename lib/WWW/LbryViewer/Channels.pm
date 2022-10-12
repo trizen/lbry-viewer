@@ -47,8 +47,8 @@ Get the most popular videos for a given channel ID.
 sub popular_videos {
     my ($self, $channel_id) = @_;
 
-    if (not defined($channel_id)) {    # trending popular videos
-        return $self->_get_results($self->_make_feed_url('popular'));
+    if (not defined($channel_id)) {    # trending popular/featured videos
+        return $self->lbry_category_videos;
     }
 
     # TODO: implement support for popular LBRY videos for a channel

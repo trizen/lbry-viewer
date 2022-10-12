@@ -765,7 +765,7 @@ sub _make_feed_url {
     my ($self, $path, %args) = @_;
 
     my $extra_args = $self->default_arguments(%args);
-    my $url        = $self->get_librarian_url() . $path;
+    my $url        = $self->get_librarian_url() . ($path // '');
 
     if ($extra_args) {
         $url .= '?' . $extra_args;

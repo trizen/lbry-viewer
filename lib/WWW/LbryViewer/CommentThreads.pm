@@ -151,6 +151,8 @@ Retrieve comments from a video ID.
 sub comments_from_video_id {
     my ($self, $video_id) = @_;
 
+    return;    # TODO: implement
+
     if ($self->get_ytdlp_comments) {
         my $comments = $self->comments_from_ytdlp($video_id);
         defined($comments) and return $comments;

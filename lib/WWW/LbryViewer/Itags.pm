@@ -46,6 +46,7 @@ sub get_itags {
         '1080' => [{value => 'hls-4026', format => 'mp4'},
                    {value => 'hls-316',  format => 'mp4'},
                    {value => 'hls-4432', format => 'mp4'},
+                   {value => '1080p',    format => 'mp4'},
                   ],
 
         '720' => [{value => "hls-176",  format => 'mp4'},
@@ -54,9 +55,11 @@ sub get_itags {
                   {value => "hls-2890", format => 'mp4'},
                   {value => "hls-3300", format => 'mp4'},
                   {value => "hls-1460", format => 'mp4'},
+                  {value => "720p",     format => 'mp4'},
                  ],
 
         '480' => [{value => "hls-1567", format => 'mp4'},],
+        '480' => [{value => "480p",     format => 'mp4'},],
 
         '360' => [{value => "hls-140-1", format => 'mp4'},
                   {value => "hls-211",   format => 'mp4'},
@@ -64,15 +67,17 @@ sub get_itags {
                   {value => "hls-655",   format => 'mp4'},
                   {value => "hls-215",   format => 'mp4'},
                   {value => "hls-525",   format => 'mp4'},
+                  {value => "360p",      format => 'mp4'},
                  ],
 
-        '240' => [],
+        '240' => [{value => "240p", format => 'mp4'},],
 
         '144' => [{value => "hls-140-0", format => 'mp4'},
                   {value => "hls-140",   format => 'mp4'},
                   {value => "hls-70",    format => 'mp4'},
                   {value => "hls-180",   format => 'mp4'},
                   {value => "hls-250",   format => 'mp4'},
+                  {value => "144p",      format => 'mp4'},
                  ],
 
         'audio' => [],

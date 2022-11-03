@@ -647,6 +647,21 @@ sub select_good_librarian_instances {
 sub _find_working_instance {
     my ($self, $candidates, $extra_candidates) = @_;
 
+    my $current_instance_file = File::Spec->catfile($self->get_config_dir, 'current_instance.json');
+
+    # Return the most recent working instance
+    if (open(my $fh, '<:raw', $current_instance_file)) {
+        my $instance = $self->parse_json_string(
+            do {
+                local $/;
+                scalar <$fh>;
+            }
+        );
+        if (ref($instance) eq 'HASH' and time - $instance->{_time} <= 3600) {
+            return $instance;
+        }
+    }
+
     require List::Util;
     state $yv_utils = WWW::LbryViewer::Utils->new();
 
@@ -663,6 +678,14 @@ sub _find_working_instance {
         my $results = $self->search_videos('test');
 
         if ($yv_utils->has_entries($results)) {
+
+            # Save the current working instance
+            if (open(my $fh, '>:raw', $current_instance_file)) {
+                $instance->{_time} = time;
+                say $fh $self->make_json_string($instance);
+                close $fh;
+            }
+
             return $instance;
         }
     }
@@ -1167,6 +1190,18 @@ Returns a list of streaming URLs for a videoID.
 
 sub get_streaming_urls {
     my ($self, $videoID) = @_;
+
+    #~ my $html = $self->lbry_video_page_html(id => $videoID);
+
+    #~ if (defined($html) and $html =~ m{}) {
+
+    #~ }
+
+    #~ use Data::Dump qw(pp);
+    #~ pp $video_info;
+
+    #~ die $video_info;
+    #~ exit;
 
     my @caption_urls;
     my @streaming_urls = $self->_fallback_extract_urls($videoID);

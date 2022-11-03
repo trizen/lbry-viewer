@@ -629,7 +629,39 @@ sub _prepare_results_for_return {
            };
 }
 
-=head2 lbry_video_info($id)
+=head2 lbry_video_page(id => $id)
+
+Get and parse the video page for a given video ID. Returns a HASH structure.
+
+=cut
+
+sub lbry_video_page {
+    my ($self, %args) = @_;
+
+    my $url  = $self->get_librarian_url . '/' . $args{id};
+    my $hash = $self->_get_librarian_data($url) // return;
+
+    my $info = $hash->{html}[0]{body}[0];
+
+    return $info;
+}
+
+=head2 lbry_video_page_html(id => $id)
+
+Get the video page for a given video ID as HTML.
+
+=cut
+
+sub lbry_video_page_html {
+    my ($self, %args) = @_;
+
+    my $url  = $self->get_librarian_url . '/' . $args{id};
+    my $html = $self->lwp_get($url) // return;
+
+    return $html;
+}
+
+=head2 lbry_video_info(id => $id)
 
 Get video info for a given YouTube video ID, by scrapping the YouTube C<watch> page.
 
@@ -638,10 +670,12 @@ Get video info for a given YouTube video ID, by scrapping the YouTube C<watch> p
 sub lbry_video_info {
     my ($self, %args) = @_;
 
-    my $url  = $self->get_librarian_url . '/' . $args{id};
-    my $hash = $self->_get_librarian_data($url) // return;
+    #~ my $url  = $self->get_librarian_url . '/' . $args{id};
+    #~ my $hash = $self->_get_librarian_data($url) // return;
 
-    my $info = $hash->{html}[0]{body}[0];
+    #~ my $info = $hash->{html}[0]{body}[0];
+
+    my $info = $self->lbry_video_page(%args);
 
     #say join ' ', keys %$info;
     #use Data::Dump qw(pp);
@@ -716,8 +750,8 @@ sub _extract_search_results {
 sub _get_librarian_data {
     my ($self, $url, %args) = @_;
 
-    my $content = $self->lwp_get($url)                // return;
-    my $hash    = $self->_parse_html($content, %args) // return;
+    my $html = $self->lwp_get($url)             // return;
+    my $hash = $self->_parse_html($html, %args) // return;
 
     return $hash;
 }

@@ -3489,7 +3489,7 @@ sub save_watched_video {
 
             $WATCHED_VIDEOS{$video_id} = 1;
 
-            open my $fh, '>>', $CONFIG{watch_history_file} or return;
+            open my $fh, '>>:utf8', $CONFIG{watch_history_file} or return;
             say {$fh} $video_id;
             close $fh;
         }
@@ -4174,7 +4174,7 @@ if ($CONFIG{cache_thumbnails} and -f $thumbnails_file) {
 }
 
 if ($CONFIG{watch_history} and -f $CONFIG{watch_history_file}) {
-    if (open my $fh, '<', $CONFIG{watch_history_file}) {
+    if (open my $fh, '<:utf8', $CONFIG{watch_history_file}) {
         chomp(my @video_ids = <$fh>);
         @WATCHED_VIDEOS{@video_ids} = ();
         close $fh;

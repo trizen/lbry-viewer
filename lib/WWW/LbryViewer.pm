@@ -73,7 +73,7 @@ my %valid_options = (
 
     # Misc
     debug       => {valid => [0 .. 3],   default => 0},
-    timeout     => {valid => qr/^\d+\z/, default => 10},
+    timeout     => {valid => qr/^\d+\z/, default => 30},
     config_dir  => {valid => qr/^./,     default => q{.}},
     cache_dir   => {valid => qr/^./,     default => q{.}},
     cookie_file => {valid => qr/^./,     default => undef},
@@ -657,6 +657,7 @@ sub _find_working_instance {
                 scalar <$fh>;
             }
         );
+        close $fh;
         if (ref($instance) eq 'HASH' and time - $instance->{_time} <= 3600) {
             return $instance;
         }
@@ -935,165 +936,6 @@ sub parse_query_string {
     return %result;
 }
 
-sub _group_keys_with_values {
-    my ($self, %data) = @_;
-
-    my @hashes;
-
-    foreach my $key (keys %data) {
-        foreach my $i (0 .. $#{$data{$key}}) {
-            $hashes[$i]{$key} = $data{$key}[$i];
-        }
-    }
-
-    return @hashes;
-}
-
-sub _check_streaming_urls {
-    my ($self, $videoID, $results) = @_;
-
-    foreach my $video (@$results) {
-
-        if (   exists $video->{s}
-            or exists $video->{signatureCipher}
-            or exists $video->{cipher}) {    # has an encrypted signature :(
-
-            if ($self->get_debug) {
-                say STDERR ":: Detected an encrypted signature...";
-            }
-
-            my @formats = $self->_fallback_extract_urls($videoID);
-
-            foreach my $format (@formats) {
-                foreach my $ref (@$results) {
-                    if (defined($ref->{itag}) and ($ref->{itag} eq $format->{itag})) {
-                        $ref->{url} = $format->{url};
-                        last;
-                    }
-                }
-            }
-
-            last;
-        }
-    }
-
-    foreach my $video (@$results) {
-        if (exists $video->{mimeType}) {
-            $video->{type} = $video->{mimeType};
-        }
-    }
-
-    return 1;
-}
-
-sub _old_extract_streaming_urls {
-    my ($self, $info, $videoID) = @_;
-
-    if ($self->get_debug) {
-        say STDERR ":: Using `url_encoded_fmt_stream_map` to extract the streaming URLs...";
-    }
-
-    my %stream_map    = $self->parse_query_string($info->{url_encoded_fmt_stream_map}, multi => 1);
-    my %adaptive_fmts = $self->parse_query_string($info->{adaptive_fmts},              multi => 1);
-
-    if ($self->get_debug >= 2) {
-        require Data::Dump;
-        Data::Dump::pp(\%stream_map);
-        Data::Dump::pp(\%adaptive_fmts);
-    }
-
-    my @results;
-
-    push @results, $self->_group_keys_with_values(%stream_map);
-    push @results, $self->_group_keys_with_values(%adaptive_fmts);
-
-    $self->_check_streaming_urls($videoID, \@results);
-
-    if ($info->{livestream} or $info->{live_playback}) {
-
-        if ($self->get_debug) {
-            say STDERR ":: Live stream detected...";
-        }
-
-        if (my @formats = $self->_fallback_extract_urls($videoID)) {
-            @results = @formats;
-        }
-        elsif (exists $info->{hlsvp}) {
-            push @results,
-              {
-                itag => 38,
-                type => 'video/ts',
-                url  => $info->{hlsvp},
-              };
-        }
-    }
-
-    return @results;
-}
-
-sub _extract_streaming_urls {
-    my ($self, $json, $videoID) = @_;
-
-    if ($self->get_debug) {
-        say STDERR ":: Using `player_response` to extract the streaming URLs...";
-    }
-
-    if ($self->get_debug >= 2) {
-        require Data::Dump;
-        Data::Dump::pp($json);
-    }
-
-    ref($json) eq 'HASH' or return;
-
-    my @results;
-    if (exists $json->{streamingData}) {
-
-        my $streamingData = $json->{streamingData};
-
-        if (defined $streamingData->{dashManifestUrl}) {
-            say STDERR ":: Contains DASH manifest URL" if $self->get_debug;
-            ##return;
-        }
-
-        if (exists $streamingData->{adaptiveFormats}) {
-            push @results, @{$streamingData->{adaptiveFormats}};
-        }
-
-        if (exists $streamingData->{formats}) {
-            push @results, @{$streamingData->{formats}};
-        }
-    }
-
-    $self->_check_streaming_urls($videoID, \@results);
-
-    # Keep only streams with contentLength > 0.
-    @results = grep { $_->{itag} == 22 or (exists($_->{contentLength}) and $_->{contentLength} > 0) } @results;
-
-    # Filter out streams with "dur=0.000"
-    @results = grep { $_->{url} !~ /\bdur=0\.000\b/ } grep { defined($_->{url}) } @results;
-
-    # Detect livestream
-    if (!@results and exists($json->{streamingData}) and exists($json->{streamingData}{hlsManifestUrl})) {
-
-        if ($self->get_debug) {
-            say STDERR ":: Live stream detected...";
-        }
-
-        @results = $self->_fallback_extract_urls($videoID);
-
-        if (!@results) {
-            push @results,
-              {
-                itag => 38,
-                type => "video/ts",
-                url  => $json->{streamingData}{hlsManifestUrl},
-              };
-        }
-    }
-
-    return @results;
-}
-
 sub _make_translated_captions {
     my ($self, $caption_urls) = @_;
 
@@ -1191,20 +1033,94 @@ Returns a list of streaming URLs for a videoID.
 sub get_streaming_urls {
     my ($self, $videoID) = @_;
 
-    #~ my $html = $self->lbry_video_page_html(id => $videoID);
-
-    #~ if (defined($html) and $html =~ m{}) {
-
-    #~ }
-
-    #~ use Data::Dump qw(pp);
-    #~ pp $video_info;
-
-    #~ die $video_info;
-    #~ exit;
-
     my @caption_urls;
-    my @streaming_urls = $self->_fallback_extract_urls($videoID);
+    my @streaming_urls;
+
+    my $html = $self->get_force_fallback ? undef : $self->lbry_video_page_html(id => $videoID);
+
+    if (defined($html) and $html =~ m{<source type="application/x-mpegurl" src="(.*?)">}) {
+
+        my $m3u8_url   = $1;
+        my $base_url   = substr($m3u8_url, 0, rindex($m3u8_url, '/') + 1);
+        my $content    = $self->lwp_get($m3u8_url);
+        my @paragraphs = split(/\R\s*\R/, $content);
+
+        foreach my $para (@paragraphs) {
+            my %info;
+
+            if (0 and $para =~ m{\bRESOLUTION=(\d+)x(\d+)\b}) {
+                my ($x, $y) = ($1, $2);
+
+                if ($y > $x) {
+                    ($x, $y) = ($y, $x);
+                }
+
+                my $res = $y;
+
+                if ($res - 100 >= 1080 or $res + 100 >= 1080) {
+                    $res = 1080;
+                }
+                elsif ($res - 100 >= 720 or $res + 100 >= 720) {
+                    $res = 720;
+                }
+                elsif ($res - 100 >= 480 or $res + 100 >= 480) {
+                    $res = 480;
+                }
+                elsif ($res - 100 >= 360 or $res + 100 >= 360) {
+                    $res = 360;
+                }
+                elsif ($res - 100 >= 144 or $res + 100 >= 144) {
+                    $res = 144;
+                }
+
+                $info{itag} = $res . 'p';
+            }
+
+            if ($para =~ m{^(\S+\.m3u8$)}m) {
+                my $filename = $1;
+                $info{url}  = $base_url . $filename;
+                $info{type} = 'video/mp4';
+                ## push @streaming_urls, \%info;
+            }
+
+            if (defined($info{url}) and $para =~ m{\bBANDWIDTH=(\d+)\b}) {
+                my $bytes    = int($1 / 1000);
+                my %new_info = %info;
+                $new_info{itag} = "hls-$bytes";
+                push @streaming_urls, \%new_info;
+            }
+        }
+
+        if ($self->get_debug) {
+            my $count = scalar(@streaming_urls);
+            say STDERR ":: Found $count streaming URLs...";
+        }
+
+        if ($self->get_debug >= 2) {
+            require Data::Dump;
+            Data::Dump::pp(\@streaming_urls);
+        }
+
+        if (@streaming_urls) {
+            return (\@streaming_urls, \@caption_urls);
+        }
+    }
+
+    if (defined($html) and $html =~ m{<source type="video/mp4" src="(.*?)">}) {
+
+        my $url = $1;
+
+        my %info = (
+                    url  => $url,
+                    itag => 'b',
+                    type => 'video/mp4',
+                   );
+
+        push @streaming_urls, \%info;
+        return (\@streaming_urls, \@caption_urls);
+    }
+
+    @streaming_urls = $self->_fallback_extract_urls($videoID);
 
     if (!@caption_urls) {
         push @caption_urls, $self->_fallback_extract_captions($videoID);

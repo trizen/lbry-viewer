@@ -584,7 +584,7 @@ load_config($config_file);
 
 if ($opt{watch_history}) {
     if (-f $opt{watch_history_file}) {
-        if (open my $fh, '<', $opt{watch_history_file}) {
+        if (open my $fh, '<:utf8', $opt{watch_history_file}) {
             chomp(my @ids = <$fh>);
             @WATCHED_VIDEOS{@ids} = ();
             close $fh;
@@ -3446,7 +3446,7 @@ sub save_watched_video {
 
             $WATCHED_VIDEOS{$video_id} = 1;
 
-            open my $fh, '>>', $opt{watch_history_file} or return;
+            open my $fh, '>>:utf8', $opt{watch_history_file} or return;
             say {$fh} $video_id;
             close $fh;
         }

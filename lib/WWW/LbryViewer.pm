@@ -377,6 +377,8 @@ sub lwp_get {
     $url || return;
     $self->{lwp} // $self->set_lwp_useragent();
 
+    state @LWP_CACHE;
+
     if ($url =~ m{^//}) {
         $url = 'https:' . $url;
     }
@@ -389,6 +391,13 @@ sub lwp_get {
 
         require MIME::Base64;
         $url = MIME::Base64::decode_base64($url);
+    }
+
+    # Check the cache
+    foreach my $entry (@LWP_CACHE) {
+        if ($entry->{url} eq $url and time - $entry->{timestamp} <= 600) {
+            return $entry->{content};
+        }
     }
 
     my $response = do {
@@ -413,7 +422,10 @@ sub lwp_get {
     };
 
     if ($response->is_success) {
-        return $response->decoded_content;
+        my $content = $response->decoded_content;
+        push(@LWP_CACHE, {url => $url, content => $content, timestamp => time});
+        shift(@LWP_CACHE) if (scalar(@LWP_CACHE) >= 50);
+        return $content;
     }
 
     $opt{depth} ||= 0;

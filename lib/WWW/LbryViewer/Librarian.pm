@@ -196,6 +196,26 @@ sub _extract_view_count_text {
     eval { $info->{shortViewCountText}{runs}[0]{text} };
 }
 
+sub _extract_query_url {
+    my ($self, $str) = @_;
+
+    my %params = $self->parse_query_string($str);
+
+    if (defined($params{url})) {
+
+        my $url = $params{url};
+
+        if ($url !~ /^https?:/) {
+            require MIME::Base64;
+            $url = MIME::Base64::decode_base64($url);
+        }
+
+        return $url;
+    }
+
+    return undef;
+}
+
 sub _extract_thumbnails {
     my ($self, $info) = @_;
     eval {
@@ -207,16 +227,7 @@ sub _extract_thumbnails {
              $thumb{url}     = $thumb{'-src'};
 
              if ($thumb{url} =~ /\?(.+)/) {
-                 my %params = $self->parse_query_string($1);
-                 if (defined($params{url})) {
-
-                     $thumb{url} = $params{url};
-
-                     if ($thumb{url} !~ /^https?:/) {
-                         require MIME::Base64;
-                         $thumb{url} = MIME::Base64::decode_base64($thumb{url});
-                     }
-                 }
+                 $thumb{url} = $self->_extract_query_url($1);
              }
 
              $thumb{url} = $self->_fix_url_protocol($thumb{url});
@@ -670,22 +681,102 @@ Get video info for a given YouTube video ID, by scrapping the YouTube C<watch> p
 sub lbry_video_info {
     my ($self, %args) = @_;
 
-    #~ my $url  = $self->get_librarian_url . '/' . $args{id};
-    #~ my $hash = $self->_get_librarian_data($url) // return;
+    my $url  = $self->get_librarian_url . '/' . $args{id};
+    my $html = $self->lwp_get($url)      // return;
+    my $hash = $self->_parse_html($html) // return;
 
-    #~ my $info = $hash->{html}[0]{body}[0];
+    my %info = (
+                type       => 'video',
+                extra_info => 1,
+                videoId    => $args{id},
+               );
 
-    my $info = $self->lbry_video_page(%args);
+    # Title
+    $info{title} = $hash->{html}[0]{head}[0]{title};
+    $info{title} =~ s{ - Librarian\z}{};
 
-    #say join ' ', keys %$info;
-    #use Data::Dump qw(pp);
-    #pp $info->{div};
-    #pp $hash;
-    #exit;
+    # View count
+    if ($html =~ m{>visibility</span>\s*<p>(\d+)</p>\s*</div>}) {
+        $info{viewCount} = $1;
+    }
 
-    return;
+    # Likes
+    if ($html =~ m{>thumb_up</span>\s*<p>(\d+)</p>\s*</div>}) {
+        $info{likeCount} = $1;
+    }
 
-    # TODO: implement it
+    # Dislikes
+    if ($html =~ m{>thumb_down</span>\s*<p>(\d+)</p>\s*</div>}) {
+        $info{dislikeCount} = $1;
+    }
+
+    # Rating
+    {
+        my $likes    = $info{likeCount}    // 0;
+        my $dislikes = $info{dislikeCount} // 0;
+
+        my $rating = 0;
+        if ($likes + $dislikes > 0) {
+            $rating = $likes / ($likes + $dislikes) * 5;
+        }
+        $info{rating} = sprintf('%.2f', $rating);
+    }
+
+    # TODO: extract the duration of the video
+    #if ($html =~ m{<p class="duration">([\d:]+)</p>}) {
+    #    $info{lengthSeconds} = _time_to_seconds($1);
+    #}
+
+    # Thumbnail
+    if ($html =~ m{<meta name="thumbnail" content="(.*?)">}) {
+        require HTML::Entities;
+        my $url = HTML::Entities::decode_entities($1);
+        if ($url =~ /\?(.+)/) {
+            $url = $self->_extract_query_url($1);
+        }
+        $info{videoThumbnails} = [
+                                  scalar {
+                                          quality => 'medium',
+                                          url     => $url,
+                                          width   => 1200,
+                                          height  => 720,
+                                         }
+                                 ];
+    }
+
+    # Published date
+    # FIXME: fails when language is not English
+    if ($html =~ m{<p><b>Shared (.*?)</b></p>}) {
+        $info{publishDate} = _extract_published_date($1);
+    }
+
+    # Description
+    if ($html =~ m{<div class="description">(.*?)</div>}s) {
+        require HTML::Entities;
+        my $desc = $1;
+        $desc =~ s{<br/>}{\n\n}g;
+        $desc =~ s{<hr/>}{'-' x 23}ge;
+        $desc =~ s{<.*?>}{}gs;
+        $desc =~ s{(?:\R\s*\R\s*)+}{\n\n}g;    # replace 2+ newlines with 2 newlines
+        $info{description} = HTML::Entities::decode_entities($desc);
+    }
+
+    # Channel name
+    if ($html =~ m{<div class="videoDesc__channel">\s*<img.*?>\s*<p>\s*<b>(.*?)</b>}) {
+        require HTML::Entities;
+        $info{author} = HTML::Entities::decode_entities($1);
+    }
+
+    # Claim ID
+    if ($html =~ m{<p class="jsonData" id="commentData">(.*?)</p>}s) {
+        my $hash = $self->parse_utf8_json_string($1);
+        $info{author} //= $hash->{channelName};
+        $info{authorId}  = $hash->{channelName} . ':' . $hash->{channelId};
+        $info{channelId} = $hash->{channelId};
+        $info{claimId}   = $hash->{claimId};
+    }
+
+    return \%info;
 }
 
 sub _parse_html {

@@ -202,6 +202,10 @@ sub find_streaming_url {
         if (exists $info_ref->{itag} and exists $info_ref->{url}) {
             $stream{$info_ref->{itag}} = $info_ref;
         }
+
+        if (exists $info_ref->{resolution} and exists $info_ref->{url}) {
+            $stream{$info_ref->{resolution}} = $info_ref;
+        }
     }
 
     # Check if we do recognize all the audio/video formats

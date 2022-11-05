@@ -522,6 +522,7 @@ sub load_config {
             if (defined($ytdl_path)) {
                 $CONFIG{ytdl_cmd}           //= $ytdl_path;
                 $CONFIG{download_with_ytdl} //= 1;
+                $CONFIG{force_fallback} = 1;
                 last;
             }
         }
@@ -1895,6 +1896,7 @@ sub get_and_play_video_ids {
             ## OK
         }
         else {
+            $info->{type}          = "video";
             $info->{title}         = "unknown";
             $info->{lengthSeconds} = 0;
             $info->{videoId}       = $id;
@@ -3782,28 +3784,27 @@ sub print_video_info {
     my $views    = $yv_utils->get_views($video);
 
     print(
-        "\n$hr\n",
-        q{ } x $rep => (_bold_color("=>> $title <<=") . "\n\n"),
-        (
-         map    { sprintf(q{-> } . "%-*s: %s\n", $opt{_colors} ? 18 : 10, _bold_color($_->[0]), $_->[1]) }
-           grep { $_->[1] !~ /^(0|unknown)\z/i }
-           grep { defined($_->[1]) } (
-             ['Channel'    => $yv_utils->get_channel_title($video)],
-             ['ChannelID'  => $yv_utils->get_channel_id($video)],
-             ['VideoID'    => $yv_utils->get_video_id($video)],
-             ['Category'   => $yv_utils->get_category_name($video)],
-             ['Definition' => $yv_utils->get_definition($video)],
-             ['Duration'   => $yv_utils->get_time($video)],
-             ['Likes'      => $yv_utils->set_thousands($likes)],
-             ['Dislikes'   => $yv_utils->set_thousands($dislikes)],
-
-             #['Rating'     => $yv_utils->get_rating($video)],
-             ['Views'     => $yv_utils->set_thousands($views)],
-             ['Published' => $yv_utils->get_publication_date($video)],
-           )
-        ),
-        "$hr\n"
-    );
+          "\n$hr\n",
+          q{ } x $rep => (_bold_color("=>> $title <<=") . "\n\n"),
+          (
+           map    { sprintf(q{-> } . "%-*s: %s\n", $opt{_colors} ? 18 : 10, _bold_color($_->[0]), $_->[1]) }
+             grep { $_->[1] !~ /^(0|unknown)\z/i }
+             grep { defined($_->[1]) } (
+                                        ['Channel'    => $yv_utils->get_channel_title($video)],
+                                        ['ChannelID'  => $yv_utils->get_channel_id($video)],
+                                        ['VideoID'    => $yv_utils->get_video_id($video)],
+                                        ['Category'   => $yv_utils->get_category_name($video)],
+                                        ['Definition' => $yv_utils->get_definition($video)],
+                                        ['Duration'   => $yv_utils->get_time($video)],
+                                        ['Likes'      => $yv_utils->set_thousands($likes)],
+                                        ['Dislikes'   => $yv_utils->set_thousands($dislikes)],
+                                        ['Rating'     => $yv_utils->get_rating($video)],
+                                        ['Views'      => $yv_utils->set_thousands($views)],
+                                        ['Published'  => $yv_utils->get_publication_date($video)],
+                                       )
+          ),
+          "$hr\n"
+         );
 
     return 1;
 }
@@ -4412,7 +4413,7 @@ Path to the C<ffmpeg> program.
 
 =head2 force_fallback
 
-Force the extraction of the streaming URLs to always use the fallback method (youtube-dl).
+Force the extraction of the streaming URLs to always use the fallback method (yt-dlp / youtube-dl).
 
 =head2 fullscreen
 

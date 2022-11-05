@@ -621,6 +621,7 @@ sub select_good_librarian_instances {
         'lbry.bcow.xyz'            => 1,    # Data collected
         'librarian.pussthecat.org' => 1,    # Data collected
         'lbry.webhop.me'           => 1,    # search doesn't work
+        'odysee.076.ne.jp'         => 1,    # website not in English (also too slow)
                   );
 
 #<<<
@@ -647,6 +648,7 @@ sub select_good_librarian_instances {
 sub _find_working_instance {
     my ($self, $candidates, $extra_candidates) = @_;
 
+    require File::Spec;
     my $current_instance_file = File::Spec->catfile($self->get_config_dir, 'current_instance.json');
 
     # Return the most recent working instance
@@ -676,12 +678,14 @@ sub _find_working_instance {
         next if $seen{$uri}++;
 
         local $self->{api_host} = $uri;
+
+        my $t0      = time;
         my $results = $self->search_videos('test');
 
         if ($yv_utils->has_entries($results)) {
 
             # Save the current working instance
-            if (open(my $fh, '>:raw', $current_instance_file)) {
+            if (time - $t0 <= 5 and open(my $fh, '>:raw', $current_instance_file)) {
                 $instance->{_time} = time;
                 say $fh $self->make_json_string($instance);
                 close $fh;
@@ -1040,7 +1044,11 @@ sub get_streaming_urls {
 
     if (defined($html) and $html =~ m{<source type="application/x-mpegurl" src="(.*?)">}) {
 
-        my $m3u8_url   = $1;
+        my $m3u8_url = $1;
+
+        require HTML::Entities;
+        $m3u8_url = HTML::Entities::decode_entities($m3u8_url);
+
         my $base_url   = substr($m3u8_url, 0, rindex($m3u8_url, '/') + 1);
         my $content    = $self->lwp_get($m3u8_url);
         my @paragraphs = split(/\R\s*\R/, $content);
@@ -1048,7 +1056,7 @@ sub get_streaming_urls {
         foreach my $para (@paragraphs) {
             my %info;
 
-            if (0 and $para =~ m{\bRESOLUTION=(\d+)x(\d+)\b}) {
+            if ($para =~ m{\bRESOLUTION=(\d+)x(\d+)\b}) {
                 my ($x, $y) = ($1, $2);
 
                 if ($y > $x) {
@@ -1073,7 +1081,7 @@ sub get_streaming_urls {
                     $res = 144;
                 }
 
-                $info{itag} = $res . 'p';
+                $info{resolution} = $res . 'p';
             }
 
             if ($para =~ m{^(\S+\.m3u8$)}m) {
@@ -1109,6 +1117,9 @@ sub get_streaming_urls {
     if (defined($html) and $html =~ m{<source type="video/mp4" src="(.*?)">}) {
 
         my $url = $1;
+
+        require HTML::Entities;
+        $url = HTML::Entities::decode_entities($url);
 
         my %info = (
                     url  => $url,

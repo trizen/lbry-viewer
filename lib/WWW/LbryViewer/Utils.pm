@@ -772,9 +772,9 @@ sub get_id {
 sub calculate_rating {
     my ($self, $info) = @_;
 
-    my $likes    = $self->get_likes($info);
+    my $likes    = $self->get_likes($info) // return undef;
     my $dislikes = $self->get_dislikes($info);
-    my $views    = $self->get_views($info);
+    my $views    = $self->get_views($info) // return undef;
 
     my $rating = "1.00";
 
@@ -864,7 +864,12 @@ sub get_publication_date {
         }
     }
 
-    defined($time) ? Encode::decode_utf8($time->strftime("%d %B %Y")) : undef;
+    if (defined($time)) {
+        $info->{timestamp} = [@$time];
+        return Encode::decode_utf8($time->strftime("%d %B %Y"));
+    }
+
+    return undef;
 }
 
 sub get_publication_time {
@@ -928,7 +933,50 @@ sub get_publication_time {
 
 sub get_publication_age {
     my ($self, $info) = @_;
-    ($info->{publishedText} // $info->{time_text} // '') =~ s/\sago\z//r;
+    (
+     $info->{publishedText} // $info->{time_text} // do {
+         $self->get_publication_date($info);
+
+         require Time::Piece;
+         my $then = $info->{timestamp};
+         my $now  = Time::Piece->new();
+
+         if (ref($then) eq 'ARRAY') {
+             $then = bless($then, 'Time::Piece');
+         }
+
+         my $diff = $now - $then;
+         my $age  = "now";
+
+         if ($diff < 60) {
+             $age = "$diff seconds";
+         }
+         elsif ($diff < 60 * 60) {
+             $age = sprintf("%.0f minutes", $diff / 60);
+         }
+         elsif ($diff < 24 * 60 * 60) {
+             $age = sprintf("%.0f hours", $diff / (60 * 60));
+         }
+         elsif ($diff < 7 * 24 * 60 * 60) {
+             $age = sprintf("%.0f days", $diff / (24 * 60 * 60));
+         }
+         elsif ($diff < 30.5 * 24 * 60 * 60) {
+             $age = sprintf("%.0f weeks", $diff / (7 * 24 * 60 * 60));
+         }
+         elsif ($diff < 12 * 30.5 * 24 * 60 * 60) {
+             $age = sprintf("%.0f months", $diff / (30.5 * 24 * 60 * 60));
+         }
+         else {
+             $age = sprintf("%.0f years", $diff / (365.2425 * 24 * 60 * 60));
+         }
+
+         if ($age =~ /^1 \w+s\z/) {
+             chop($age);    # make it singular
+         }
+
+         $age;
+     }
+    ) =~ s/\sago\z//r;
 }
 
 sub get_publication_age_approx {
@@ -971,7 +1019,7 @@ sub get_time {
         return 'LIVE';
     }
 
-    $self->format_time($self->get_duration($info));
+    $self->format_time($self->get_duration($info) // return undef);
 }
 
 sub get_definition {
@@ -1047,12 +1095,12 @@ sub get_views_approx {
 
 sub get_likes {
     my ($self, $info) = @_;
-    $info->{likeCount} // 0;
+    $info->{likeCount};
 }
 
 sub get_dislikes {
     my ($self, $info) = @_;
-    $info->{dislikeCount} // 0;
+    $info->{dislikeCount};
 }
 
 sub get_comments {

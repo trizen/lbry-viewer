@@ -121,8 +121,10 @@ sub _fallback_video_details {
         return scalar {
 
             extra_info => 1,
-            title      => $info->{fulltitle} // $info->{title},
-            videoId    => $id,
+            type       => 'video',
+
+            title   => $info->{fulltitle} // $info->{title},
+            videoId => $id,
 
             videoThumbnails => [
                           map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
@@ -150,7 +152,9 @@ sub _fallback_video_details {
         };
     }
     else {
-        ## TODO: extract video info from the Librarian website.
+        if (defined(my $info = $self->lbry_video_info(id => $id))) {
+            return $info;
+        }
     }
 
     return {};
@@ -163,83 +167,13 @@ sub video_details {
         say STDERR ":: Extracting video info using the fallback method...";
     }
 
-    # TODO: extract video info from the Librarian website (it would be faster)
-    # return $self->lbry_video_info(id => $id);
+    # Extract info from the Librarian website
+    if (not $self->get_force_fallback and defined(my $info = $self->lbry_video_info(id => $id))) {
+        return $info;
+    }
 
+    # Extract info with youtube-dl / yt-dlp
     return $self->_fallback_video_details($id, $fields);
-
-    my %video_info = $self->_get_video_info($id);
-    my $video = $self->parse_json_string($video_info{player_response} // return $self->_fallback_video_details($id, $fields));
-
-    state %cache;
-    my $extra_info = ($cache{$id} //= $self->lbry_video_info(id => $id));
-
-    my $videoDetails = {};
-    my $microformat  = {};
-
-    if (exists $video->{videoDetails}) {
-        $videoDetails = $video->{videoDetails};
-    }
-    else {
-        return $self->_fallback_video_details($id, $fields);
-    }
-
-    if (exists $video->{microformat}) {
-        $microformat = eval { $video->{microformat}{playerMicroformatRenderer} } // {};
-    }
-
-    my %details = (
-        title   => eval { $microformat->{title}{simpleText} } // $videoDetails->{title},
-        videoId => $videoDetails->{videoId},
-
-        videoThumbnails => [
-                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
-                            @{$videoDetails->{thumbnail}{thumbnails}}
-                           ],
-
-        liveNow       => ($videoDetails->{isLiveContent} || (($videoDetails->{lengthSeconds} || 0) == 0)),
-        description   => eval { $microformat->{description}{simpleText} } // $videoDetails->{shortDescription},
-        lengthSeconds => $videoDetails->{lengthSeconds}                   // $microformat->{lengthSeconds},
-
-        category    => $microformat->{category},
-        publishDate => $microformat->{publishDate},
-
-        keywords  => $videoDetails->{keywords},
-        viewCount => $videoDetails->{viewCount} // $microformat->{viewCount},
-
-        author   => $videoDetails->{author}    // $microformat->{ownerChannelName},
-        authorId => $videoDetails->{channelId} // $microformat->{externalChannelId},
-        rating   => $videoDetails->{averageRating},
-    );
-
-    if (defined($extra_info) and ref($extra_info) eq 'HASH') {
-
-        #require WWW::LbryViewer::Utils;
-        #state $yv_utils = WWW::LbryViewer::Utils->new();
-
-        my $like_count = $extra_info->{likeCount};
-
-        $details{likeCount} = $like_count;
-        ##$details{likeCount} = $yv_utils->short_human_number($like_count);
-
-        if ($like_count and $details{rating} and $details{rating} > 1) {
-
-            my $rating        = $details{rating};
-            my $dislike_count = sprintf('%.0f', $like_count * ((5 - $rating) / ($rating - 1)));
-
-            $details{dislikeCount} = $dislike_count;
-            ##$details{dislikeCount} = $yv_utils->short_human_number($dislike_count);
-        }
-
-        $details{author} //= $extra_info->{author};
-        $details{title}  //= $extra_info->{title};
-
-        if (not defined($details{publishDate})) {
-            $details{publishedText} = $extra_info->{publishDate};
-        }
-    }
-
-    return \%details;
 }
 
 =head2 Return details

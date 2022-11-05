@@ -935,7 +935,9 @@ sub get_publication_age {
     my ($self, $info) = @_;
     (
      $info->{publishedText} // $info->{time_text} // do {
+
          $self->get_publication_date($info);
+         $info->{timestamp} // return undef;
 
          require Time::Piece;
          my $then = $info->{timestamp};

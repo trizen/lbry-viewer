@@ -738,7 +738,7 @@ sub lbry_video_info {
                                   scalar {
                                           quality => 'medium',
                                           url     => $url,
-                                          width   => 1200,
+                                          width   => 1280,
                                           height  => 720,
                                          }
                                  ];

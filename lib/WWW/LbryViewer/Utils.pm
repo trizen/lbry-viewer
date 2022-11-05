@@ -939,42 +939,16 @@ sub get_publication_age {
 
          require Time::Piece;
          my $then = $info->{timestamp};
-         my $now  = Time::Piece->new();
 
          if (ref($then) eq 'ARRAY') {
              $then = bless($then, 'Time::Piece');
          }
 
-         my $diff = $now - $then;
-         my $age  = "now";
+         # Format: "2010-02-19T00:25:55"
+         my $date = $then->strftime("%Y-%m-%dT%H:%M:%S");
 
-         if ($diff < 60) {
-             $age = "$diff seconds";
-         }
-         elsif ($diff < 60 * 60) {
-             $age = sprintf("%.0f minutes", $diff / 60);
-         }
-         elsif ($diff < 24 * 60 * 60) {
-             $age = sprintf("%.0f hours", $diff / (60 * 60));
-         }
-         elsif ($diff < 7 * 24 * 60 * 60) {
-             $age = sprintf("%.0f days", $diff / (24 * 60 * 60));
-         }
-         elsif ($diff < 30.5 * 24 * 60 * 60) {
-             $age = sprintf("%.0f weeks", $diff / (7 * 24 * 60 * 60));
-         }
-         elsif ($diff < 12 * 30.5 * 24 * 60 * 60) {
-             $age = sprintf("%.0f months", $diff / (30.5 * 24 * 60 * 60));
-         }
-         else {
-             $age = sprintf("%.0f years", $diff / (365.2425 * 24 * 60 * 60));
-         }
-
-         if ($age =~ /^1 \w+s\z/) {
-             chop($age);    # make it singular
-         }
-
-         $age;
+         # Convert date to age
+         $self->date_to_age($date);
      }
     ) =~ s/\sago\z//r;
 }

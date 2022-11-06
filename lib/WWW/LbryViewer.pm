@@ -423,8 +423,8 @@ sub lwp_get {
 
     if ($response->is_success) {
         my $content = $response->decoded_content;
-        push(@LWP_CACHE, {url => $url, content => $content, timestamp => time});
-        shift(@LWP_CACHE) if (scalar(@LWP_CACHE) >= 50);
+        unshift(@LWP_CACHE, {url => $url, content => $content, timestamp => time});
+        pop(@LWP_CACHE) if (scalar(@LWP_CACHE) >= 50);
         return $content;
     }
 

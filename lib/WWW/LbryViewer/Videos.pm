@@ -112,7 +112,7 @@ sub _fallback_video_details {
     my ($self, $id, $fields) = @_;
 
     if ($self->get_debug) {
-        say STDERR ":: Extracting video info with youtube-dl...";
+        say STDERR ":: Extracting video info using the fallback method...";
     }
 
     my $info = $self->_ytdl_video_details($id);
@@ -126,10 +126,18 @@ sub _fallback_video_details {
             title   => $info->{fulltitle} // $info->{title},
             videoId => $id,
 
+#<<<
             videoThumbnails => [
-                          map { scalar {quality => 'medium', url => $_->{url}, width => $_->{width}, height => $_->{height},} }
-                            @{$info->{thumbnails}}
+                    map {
+                        scalar {
+                              quality => 'medium',
+                              url     => $_->{url},
+                              width   => $_->{width},
+                              height  => $_->{height},
+                        }
+                    } @{$info->{thumbnails}}
             ],
+#>>>
 
             liveNow       => ($info->{is_live} ? 1 : 0),
             description   => $info->{description},
@@ -152,6 +160,11 @@ sub _fallback_video_details {
         };
     }
     else {
+
+        if ($self->get_debug) {
+            say STDERR ":: The fallback method failed. Trying the main method..";
+        }
+
         if (defined(my $info = $self->lbry_video_info(id => $id))) {
             return $info;
         }
@@ -162,10 +175,6 @@ sub _fallback_video_details {
 
 sub video_details {
     my ($self, $id, $fields) = @_;
-
-    if ($self->get_debug) {
-        say STDERR ":: Extracting video info using the fallback method...";
-    }
 
     # Extract info from the Librarian website
     if (not $self->get_force_fallback and defined(my $info = $self->lbry_video_info(id => $id))) {

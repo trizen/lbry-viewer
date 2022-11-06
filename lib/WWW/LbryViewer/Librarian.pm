@@ -306,7 +306,7 @@ sub _extract_itemSection_entry {
 
         foreach my $entry (@{$info}) {
 
-            if ($entry->{'-class'} eq 'thumbnailWrapper') {
+            if ($entry->{'-class'} eq 'thumbnailWrapper' or $entry->{'-class'} eq 'relVid__thumbnailWrapper') {
                 my $link = $entry->{a}[0];
                 $video{videoId}         = (($link->{'-href'} // '') =~ s{^/}{}r);
                 $video{videoThumbnails} = $self->_extract_thumbnails($link->{img});
@@ -317,7 +317,7 @@ sub _extract_itemSection_entry {
                 }
             }
 
-            if ($entry->{'-class'} eq 'claimMeta') {
+            if ($entry->{'-class'} eq 'claimMeta' or $entry->{'-class'} eq 'relVid__meta') {
                 $is_video = 1;
                 my $p = $entry->{p};
                 $video{publishedText} = _extract_published_text($p->[0]{'#text'});
@@ -674,7 +674,7 @@ sub lbry_video_page_html {
 
 =head2 lbry_video_info(id => $id)
 
-Get video info for a given YouTube video ID, by scrapping the YouTube C<watch> page.
+Get video info for a given video ID.
 
 =cut
 
@@ -685,10 +685,35 @@ sub lbry_video_info {
     my $html = $self->lwp_get($url)      // return;
     my $hash = $self->_parse_html($html) // return;
 
+    # Related videos
+    my $related_vids_data = $hash->{html}[0]{body}[0]{div};
+
+    foreach my $key (qw(videoData videoData__left videoData__right relVids)) {
+        ref($related_vids_data) eq 'ARRAY' or last;
+        foreach my $entry (@$related_vids_data) {
+            if (ref($entry) eq 'HASH' and ($entry->{'-class'} // '') eq $key and exists($entry->{div})) {
+                $related_vids_data = $entry->{'div'};
+                last;
+            }
+        }
+    }
+
+    my @related_videos;
+    if (ref($related_vids_data) eq 'ARRAY') {
+        foreach my $entry (@$related_vids_data) {
+            ref($entry) eq 'HASH' or next;
+            exists($entry->{div}) or next;
+            $entry->{'-class'} = 'video';
+            my $info = $self->_extract_itemSection_entry($entry, type => 'video');
+            push @related_videos, $info;
+        }
+    }
+
     my %info = (
-                type       => 'video',
-                extra_info => 1,
-                videoId    => $args{id},
+                type           => 'video',
+                extra_info     => 1,
+                videoId        => $args{id},
+                related_videos => \@related_videos,
                );
 
     # Title
@@ -754,10 +779,11 @@ sub lbry_video_info {
     if ($html =~ m{<div class="description">(.*?)</div>}s) {
         require HTML::Entities;
         my $desc = $1;
+        $desc =~ s{<p>(.*?)</p>}{ $1 =~ s{<br/>}{\n}gr }sge;
         $desc =~ s{<br/>}{\n\n}g;
         $desc =~ s{<hr/>}{'-' x 23}ge;
         $desc =~ s{<.*?>}{}gs;
-        $desc =~ s{(?:\R\s*\R\s*)+}{\n\n}g;    # replace 2+ newlines with 2 newlines
+        $desc =~ s{(?:\R\s*\R\s*)+}{\n\n}g;                    # replace 2+ newlines with 2 newlines
         $info{description} = HTML::Entities::decode_entities($desc);
     }
 

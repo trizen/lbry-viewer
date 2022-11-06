@@ -779,11 +779,13 @@ sub lbry_video_info {
     if ($html =~ m{<div class="description">(.*?)</div>}s) {
         require HTML::Entities;
         my $desc = $1;
-        $desc =~ s{<p>(.*?)</p>}{ $1 =~ s{<br/>}{\n}gr }sge;
-        $desc =~ s{<br/>}{\n\n}g;
-        $desc =~ s{<hr/>}{'-' x 23}ge;
-        $desc =~ s{<.*?>}{}gs;
-        $desc =~ s{(?:\R\s*\R\s*)+}{\n\n}g;                    # replace 2+ newlines with 2 newlines
+        $desc =~ s{<p>(.*?)</p>}{ $1 =~ s{<br/>}{\n}gr }sge;    # replace <br/> with 1 newline inside <p>...</p>
+        $desc =~ s{<br/>}{\n\n}g;                               # replace <br/> with 2 newlines
+        $desc =~ s{<hr/>}{'-' x 23}ge;                          # replace <hr/> with ----
+        $desc =~ s{<.*?>}{}gs;                                  # remove HTML tags
+        $desc =~ s{(?:\R\s*\R\s*)+}{\n\n}g;                     # replace 2+ newlines with 2 newlines
+        $desc =~ s/^\s+//;                                      # remove leading space
+        $desc =~ s/\s+\z//;                                     # remove trailing space
         $info{description} = HTML::Entities::decode_entities($desc);
     }
 

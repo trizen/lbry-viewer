@@ -330,7 +330,7 @@ sub _extract_itemSection_entry {
 
         $video{title}    = $links->[0]{a}[0]{'#text'};
         $video{author}   = $links->[1]{a}[0]{'#text'} // $links->[0]{a}[0]{'#text'};
-        $video{authorId} = (($links->[1]{a}[0]{'-href'} // $links->[0]{a}[0]{'-href'}) =~ s{^/}{}r);
+        $video{authorId} = (($links->[1]{a}[0]{'-href'} // $links->[0]{a}[0]{'-href'} // '') =~ s{^/}{}r);
 
         # Probably it's a channel
         if (not $is_video) {
@@ -383,7 +383,7 @@ sub _extract_itemSection_entry {
         }
 
         $channel{author}   = $links->[0]{a}[0]{'#text'} // $links->[1]{a}[0]{'#text'};
-        $channel{authorId} = (($links->[1]{a}[0]{'-href'} // $links->[0]{a}[0]{'-href'}) =~ s{^/}{}r);
+        $channel{authorId} = (($links->[1]{a}[0]{'-href'} // $links->[0]{a}[0]{'-href'} // '') =~ s{^/}{}r);
 
         if (($links->[2]{'#text'} // '') =~ /([\d,.]+\s*[KMB]?)\s*followers\s*([\d,.]+\s*[KMB]?)\s*uploads/i) {
             my ($subs, $uploads) = ($1, $2);
@@ -898,7 +898,7 @@ sub lbry_search {
     }
 
     # Set the NSFW cookie
-    $cookie_jar->set_cookie(0, "nsfw", ($self->get_nsfw ? "true" : "false"), "/", $domain, undef, 0, "", 3806952123, 0, {},);
+    $cookie_jar->set_cookie(0, "nsfw", ($self->get_nsfw ? "true" : "false"), "/", $domain, undef, 0, "", 3806952123, 0, {});
 
     # This does not support caching
     # my $content = $self->lwp_post($url, \%params) // return;

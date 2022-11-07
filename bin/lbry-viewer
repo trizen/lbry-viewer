@@ -1983,7 +1983,13 @@ sub lbry_urls {
     my ($arg) = @_;
 
     if ($arg =~ /$get_video_id_re/) {
-        get_and_play_video_ids($+{video_id});
+        my $id = $+{video_id};
+        if ($id =~ m{/}) {
+            get_and_play_video_ids($id);
+        }
+        else {
+            print_videos($yv_obj->uploads($id));
+        }
     }
     elsif ($arg =~ /$get_playlist_id_re/) {
         get_and_print_videos_from_playlist($+{playlist_id});

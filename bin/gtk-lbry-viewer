@@ -2375,12 +2375,18 @@ sub check_keywords {
     my ($key) = @_;
 
     if ($key =~ /$get_video_id_re/o) {
-        my $info = $yv_obj->video_details($+{video_id});
-        if (ref($info) eq 'HASH' and keys %$info) {
-            play_video($info) || return;
+        my $id = $+{video_id};
+        if ($id =~ m{/}) {
+            my $info = $yv_obj->video_details($id);
+            if (ref($info) eq 'HASH' and keys %$info) {
+                play_video($info) || return;
+            }
+            else {
+                return;
+            }
         }
         else {
-            return;
+            list_channel_videos($id);
         }
     }
     elsif ($key =~ /$get_playlist_id_re/o) {

@@ -691,13 +691,12 @@ sub _find_working_instance {
 
         local $self->{api_host} = $uri;
 
-        my $t0      = time;
         my $results = $self->search_videos('test');
 
         if ($yv_utils->has_entries($results)) {
 
             # Save the current working instance
-            if (time - $t0 <= 5 and open(my $fh, '>:raw', $current_instance_file)) {
+            if (open(my $fh, '>:raw', $current_instance_file)) {
                 $instance->{_time} = time;
                 say $fh $self->make_json_string($instance);
                 close $fh;
@@ -1058,11 +1057,15 @@ sub get_streaming_urls {
 
         my $m3u8_url = $1;
 
+        if ($m3u8_url =~ m{^/}) {
+            $m3u8_url = $self->get_librarian_url . $m3u8_url;
+        }
+
         require HTML::Entities;
         $m3u8_url = HTML::Entities::decode_entities($m3u8_url);
 
         my $base_url   = substr($m3u8_url, 0, rindex($m3u8_url, '/') + 1);
-        my $content    = $self->lwp_get($m3u8_url);
+        my $content    = ($m3u8_url =~ m{^https?://} ? $self->lwp_get($m3u8_url) : '');
         my @paragraphs = split(/\R\s*\R/, $content);
 
         foreach my $para (@paragraphs) {
@@ -1130,6 +1133,10 @@ sub get_streaming_urls {
 
         my $url = $1;
 
+        if ($url =~ m{^/}) {
+            $url = $self->get_librarian_url . $url;
+        }
+
         require HTML::Entities;
         $url = HTML::Entities::decode_entities($url);
 
@@ -1139,8 +1146,10 @@ sub get_streaming_urls {
                     type => 'video/mp4',
                    );
 
-        push @streaming_urls, \%info;
-        return (\@streaming_urls, \@caption_urls);
+        if ($url =~ m{^https?://}) {
+            push @streaming_urls, \%info;
+            return (\@streaming_urls, \@caption_urls);
+        }
     }
 
     @streaming_urls = $self->_fallback_extract_urls($videoID);

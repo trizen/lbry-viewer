@@ -968,6 +968,8 @@ Latest uploads for a given channel ID or username.
 sub lbry_channel_uploads {
     my ($self, $channel, %args) = @_;
 
+    $channel // return;
+
     my $url = $self->get_librarian_url . "/$channel";
 
     my $hash    = $self->_get_librarian_data($url, %args) // return;

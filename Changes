@@ -5,6 +5,15 @@
 
 [CHANGELOG]
 
+Version 0.0.6
+
+- Added support for categories.
+- Added support for related videos.
+- Added basic GET cache in `lwp_get()`.
+- Added support for listing channel uploads from channel URL.
+- Support for extracting video information from the Librarian instances.
+- Remember a working Librarian instance and reuse it for 1 hour.
+
 Version 0.0.5
 
 - Added support for `api_host => "auto"` to use a random Librarian instance.

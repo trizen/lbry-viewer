@@ -15,7 +15,7 @@
 #-------------------------------------------------------
 #  lbry-viewer
 #  Fork: 27 May 2022
-#  Edit: 05 October 2022
+#  Edit: 08 November 2022
 #  https://github.com/trizen/lbry-viewer
 #-------------------------------------------------------
 
@@ -46,7 +46,7 @@ no warnings 'once';
 my $DEVEL;                                           # true in devel mode
 use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel mode
 
-use WWW::LbryViewer v0.0.5;
+use WWW::LbryViewer v0.0.6;
 use WWW::LbryViewer::RegularExpressions;
 
 require Storable;

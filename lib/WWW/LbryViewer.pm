@@ -35,7 +35,7 @@ WWW::LbryViewer - A simple interface to YouTube.
 
 =cut
 
-our $VERSION = '0.0.5';
+our $VERSION = '0.0.6';
 
 =head1 SYNOPSIS
 
@@ -111,6 +111,7 @@ my %valid_options = (
     # LWP user agent
     #user_agent => {valid => qr/^.{5}/, default => 'Mozilla/5.0 (iPad; CPU OS 7_1_1 like Mac OS X) AppleWebKit/537.51.2 (KHTML, like Gecko) Version/7.0 Mobile/11D201 Safari/9537.53'},
     user_agent => {valid => qr/^.{5}/, default => 'Mozilla/5.0 (Android 11; Tablet; rv:83.0) Gecko/83.0 Firefox/83.0,gzip(gfe)'},
+    #user_agent => {valid => qr/^.{5}/, default => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:91.0) Gecko/20100101 Firefox/91.0'},
 #>>>
 );
 
@@ -312,6 +313,11 @@ sub set_lwp_useragent {
 
     $agent->ssl_opts(Timeout => $self->get_timeout);
     $agent->default_header('Accept-Encoding' => $accepted_encodings);
+    $agent->default_header('Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
+    $agent->default_header('Accept-Language' => 'en-US,en;q=0.5');
+    $agent->default_header('DNT'             => '1');
+    $agent->default_header('Connection'      => 'keep-alive');
+    $agent->default_header('Upgrade-Insecure-Requests' => '1');
     $agent->conn_cache($cache);
     $agent->proxy(['http', 'https'], $self->get_http_proxy) if defined($self->get_http_proxy);
 
@@ -391,6 +397,10 @@ sub lwp_get {
 
         require MIME::Base64;
         $url = MIME::Base64::decode_base64($url);
+    }
+
+    if ($url !~ m{^\w+://}) {    # no protocol
+        return;
     }
 
     # Check the cache
@@ -516,11 +526,9 @@ sub get_librarian_instances {
     # Get the "instances.json" file when the local copy is too old or non-existent
     if ((not -e $instances_file) or (-M _) > 1 / 24) {
 
-        require LWP::UserAgent;
+        $self->{lwp} // $self->set_lwp_useragent();
 
-        my $lwp = LWP::UserAgent->new(timeout => $self->get_timeout);
-        $lwp->show_progress(1) if $self->get_debug;
-        my $resp = $lwp->get("https://codeberg.org/librarian/librarian/raw/branch/main/instances.json");
+        my $resp = $self->{lwp}->get("https://codeberg.org/librarian/librarian/raw/branch/main/instances.json");
 
         $resp->is_success() or return;
 

@@ -15,7 +15,7 @@
 #-------------------------------------------------------
 #  GTK Lbry Viewer
 #  Fork: 27 May 2022
-#  Edit: 05 October 2022
+#  Edit: 08 November 2022
 #  https://github.com/trizen/lbry-viewer
 #-------------------------------------------------------
 
@@ -31,7 +31,7 @@ no warnings 'once';
 my $DEVEL;                                           # true in devel mode
 use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel only
 
-use WWW::LbryViewer v0.0.5;
+use WWW::LbryViewer v0.0.6;
 use WWW::LbryViewer::RegularExpressions;
 
 use Gtk3                  qw(-init);
@@ -2489,7 +2489,7 @@ sub get_code {
                 my $results;
                 my $next_page_token = $liststore->get($iter, 5);
 
-                if (substr($next_page_token, 0, 4) eq 'json') {
+                if (defined($next_page_token) and substr($next_page_token, 0, 4) eq 'json') {
                     my ($format, $json_data) = split(' ', $next_page_token, 2);
 
                     if ($format eq 'json-deflate') {

@@ -12,6 +12,7 @@ WriteMakefile
                    'File::Spec' => 0,
                    'File::Spec::Functions' => 0,
                    'Getopt::Long' => 0,
+                   'HTML::Entities' => 0,
                    'HTML::Tree' => 0,
                    'HTTP::Request' => 0,
                    'JSON' => 0,

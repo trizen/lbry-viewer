@@ -53,6 +53,7 @@ my $builder = Module::Build->new(
         'Text::Wrap'            => 0,
         'URI::Escape'           => 0,
         'HTML::Tree'            => 0,
+        'HTML::Entities'        => 0,
 
         $gtk
         ? (

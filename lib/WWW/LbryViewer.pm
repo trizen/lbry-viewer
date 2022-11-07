@@ -405,7 +405,9 @@ sub lwp_get {
 
     # Check the cache
     foreach my $entry (@LWP_CACHE) {
-        if ($entry->{url} eq $url and time - $entry->{timestamp} <= 600) {
+        if (    $entry->{url} eq $url
+            and $entry->{nsfw} eq ($self->get_nsfw ? 'true' : 'false')
+            and time - $entry->{timestamp} <= 600) {
             return $entry->{content};
         }
     }
@@ -433,7 +435,15 @@ sub lwp_get {
 
     if ($response->is_success) {
         my $content = $response->decoded_content;
-        unshift(@LWP_CACHE, {url => $url, content => $content, timestamp => time});
+        unshift(
+                @LWP_CACHE,
+                scalar {
+                        url       => $url,
+                        content   => $content,
+                        timestamp => time,
+                        nsfw      => ($self->get_nsfw ? 'true' : 'false')
+                       }
+               );
         pop(@LWP_CACHE) if (scalar(@LWP_CACHE) >= 50);
         return $content;
     }

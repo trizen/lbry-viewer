@@ -3893,13 +3893,7 @@ sub save_session {
     $ResultsHistory{current} = $#left + 1;
     $ResultsHistory{results} = [@left, $curr_result, @right];
 
-    Storable::store(
-                    {
-                     keyword => $search_entry->get_text,
-                     history => \%ResultsHistory,
-                    },
-                    $session_file
-                   );
+    eval { Storable::store({keyword => $search_entry->get_text, history => \%ResultsHistory,}, $session_file) };
 
     # Keep only thumbnails that have been accessed in the past 3 days
     my @keys = grep { time - $THUMBNAILS_CACHE->{$_}{timestamp} <= 259200 } keys %{$THUMBNAILS_CACHE};

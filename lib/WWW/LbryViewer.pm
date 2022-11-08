@@ -73,7 +73,7 @@ my %valid_options = (
 
     # Misc
     debug       => {valid => [0 .. 3],   default => 0},
-    timeout     => {valid => qr/^\d+\z/, default => 30},
+    timeout     => {valid => qr/^\d+\z/, default => 10},
     config_dir  => {valid => qr/^./,     default => q{.}},
     cache_dir   => {valid => qr/^./,     default => q{.}},
     cookie_file => {valid => qr/^./,     default => undef},
@@ -401,6 +401,12 @@ sub lwp_get {
 
     if ($url !~ m{^\w+://}) {    # no protocol
         return;
+    }
+
+    # Redirect early spee.ch to player.odycdn.com
+    # Example: https://spee.ch/0/9e11969ec347a6f9.png
+    if ($url =~ m{^https://spee\.ch/(\w+)/(\w+)\.(\w+)\z}) {
+        $url = "https://player.odycdn.com/speech/$2:$1.$3";
     }
 
     # Check the cache

@@ -31,6 +31,7 @@ no warnings 'once';
 my $DEVEL;                                           # true in devel mode
 use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel only
 
+use List::Util qw(min max);
 use WWW::LbryViewer v0.0.6;
 use WWW::LbryViewer::RegularExpressions;
 
@@ -709,8 +710,6 @@ foreach my $path ($CONFIG{cache_dir}) {
             }
             undef $history{CORE::fc($line)};
         }
-
-        require List::Util;
 
         # Workaround for List::Util < 1.45
         if (!defined(&List::Util::uniq)) {
@@ -2574,6 +2573,16 @@ sub lwp_get {
     return $data;
 }
 
+sub fit_to_dimensions {
+    my ($width, $height, $max_width, $max_height) = @_;
+    my $scale = min($max_width / $width, $max_height / $height);
+    if ($scale < 1.0) {
+        $width  *= $scale;
+        $height *= $scale;
+    }
+    return ($width, $height);
+}
+
 sub get_pixbuf_thumbnail_from_content {
     my ($thumbnail, $url, $xsize, $ysize) = @_;
 
@@ -2595,7 +2604,17 @@ sub get_pixbuf_thumbnail_from_content {
     if (defined $thumbnail) {
         eval {
             my $pixbufloader = 'Gtk3::Gdk::PixbufLoader'->new;
-            $pixbufloader->set_size($xsize, $ysize);
+
+            $pixbufloader->signal_connect(
+                'size-prepared' => sub {
+                    my ($loader, $width, $height) = @_;
+                    my ($fit_width, $fit_height) = fit_to_dimensions($width, $height, $xsize, $ysize);
+                    my $resized = ($fit_width != $width or $fit_height != $height);
+                    $loader->set_size($fit_width, $fit_height) if $resized;
+                }
+            );
+
+            #$pixbufloader->set_size($xsize, $ysize);
             ##$pixbufloader->write($thumbnail);      # Gtk3 bug on older versions
             $pixbufloader->write([unpack('C*', $thumbnail)]);
             $pixbufloader->close;
@@ -3878,11 +3897,9 @@ sub save_session {
 
     my @results = @{$ResultsHistory{results}};
 
-    require List::Util;
-
     my $max   = $CONFIG{remember_session_depth};
-    my @left  = @results[List::Util::max(0, $curr - $max) .. $curr - 1];
-    my @right = @results[$curr + 1 .. List::Util::min($#results, $curr + $max)];
+    my @left  = @results[max(0, $curr - $max) .. $curr - 1];
+    my @right = @results[$curr + 1 .. min($#results, $curr + $max)];
 
     if ($yv_obj->get_debug) {
         say "Session total: ", scalar(@results);

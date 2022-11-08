@@ -5,6 +5,12 @@
 
 [CHANGELOG]
 
+Version 0.0.7
+
+- GUI: keep aspect ratio of thumbnails.
+- GUI: fixed the loading of thumbnails on older versions of `gtk3`.
+- Fixed an internal cache bug with `nsfw` disabled, then enabled (or viceversa).
+
 Version 0.0.6
 
 - Added support for categories.

@@ -368,13 +368,6 @@ sub _warn_reponse_error {
 
 Get and return the content for $url.
 
-Where %opt can be:
-
-    simple => [bool]
-
-When the value of B<simple> is set to a true value, the
-authentication header will not be set in the HTTP request.
-
 =cut
 
 sub lwp_get {
@@ -406,7 +399,9 @@ sub lwp_get {
     # Redirect early spee.ch to player.odycdn.com
     # Example: https://spee.ch/0/9e11969ec347a6f9.png
     if ($url =~ m{^https://spee\.ch/(\w+)/(\w+)\.(\w+)\z}) {
-        $url = "https://player.odycdn.com/speech/$2:$1.$3";
+        if ($3 ne 'gif') {
+            $url = "https://player.odycdn.com/speech/$2:$1.$3";
+        }
     }
 
     # Check the cache

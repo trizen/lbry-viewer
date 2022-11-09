@@ -2584,32 +2584,39 @@ sub get_pixbuf_thumbnail_from_content {
 
     state %cache;
 
-    require Digest::MD5;
-    my $key = Digest::MD5::md5_hex($url);
-
-    if (exists $cache{$key}) {
-        return $cache{$key};
+    if (exists $cache{$url}) {
+        return $cache{$url};
     }
 
     my $pixbuf;
     if (defined $thumbnail) {
         eval {
-            my $pixbufloader = 'Gtk3::Gdk::PixbufLoader'->new;
+            if (length($thumbnail) > 1024**2 or $thumbnail =~ /^GIF8[79]a/) {    # GIF or greater than 1 MB
+                require File::Temp;
+                my ($fh, $filename) = File::Temp::tempfile();
+                print $fh $thumbnail;
+                close $fh;
+                $pixbuf = 'Gtk3::Gdk::Pixbuf'->new_from_file_at_scale($filename, $xsize, $ysize, 1);
+                unlink($filename);
+            }
+            else {
+                my $pixbufloader = 'Gtk3::Gdk::PixbufLoader'->new;
 
-            $pixbufloader->signal_connect(
-                'size-prepared' => sub {
-                    my ($loader, $width, $height) = @_;
-                    my ($fit_width, $fit_height) = fit_to_dimensions($width, $height, $xsize, $ysize);
-                    my $resized = ($fit_width != $width or $fit_height != $height);
-                    $loader->set_size($fit_width, $fit_height) if $resized;
-                }
-            );
+                $pixbufloader->signal_connect(
+                    'size-prepared' => sub {
+                        my ($loader, $width, $height) = @_;
+                        my ($fit_width, $fit_height) = fit_to_dimensions($width, $height, $xsize, $ysize);
+                        my $resized = ($fit_width != $width or $fit_height != $height);
+                        $loader->set_size($fit_width, $fit_height) if $resized;
+                    }
+                );
 
-            #$pixbufloader->set_size($xsize, $ysize);
-            ##$pixbufloader->write($thumbnail);      # Gtk3 bug on older versions
-            $pixbufloader->write([unpack('C*', $thumbnail)]);
-            $pixbufloader->close;
-            $pixbuf = $pixbufloader->get_pixbuf;
+                #$pixbufloader->set_size($xsize, $ysize);
+                ##$pixbufloader->write($thumbnail);      # Gtk3 bug on older versions
+                $pixbufloader->write([unpack('C*', $thumbnail)]);
+                $pixbufloader->close;
+                $pixbuf = $pixbufloader->get_pixbuf;
+            }
         };
     }
 
@@ -2623,7 +2630,7 @@ sub get_pixbuf_thumbnail_from_content {
     }
 
     $pixbuf //= $default_thumb;
-    $cache{$key} = $pixbuf;
+    $cache{$url} = $pixbuf;
 
     return $pixbuf;
 }

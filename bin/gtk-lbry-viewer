@@ -422,8 +422,6 @@ my %objects = (
     'audio_only_checkbutton' => \my $audio_only_checkbutton,
     'hbox2'                  => \my $hbox2,
     'feeds_title'            => \my $feeds_title,
-    'channel_name_save'      => \my $save_channel_name_entry,
-    'channel_id_save'        => \my $save_channel_id_entry,
     'main-menu-history-menu' => \my $history_menu,
               );
 
@@ -1587,28 +1585,46 @@ HELP_TEXT
 
 # ------------------- Accels ------------------- #
 
-# Main window
-my $accel = Gtk3::AccelGroup->new;
-$accel->connect(ord('h'), ['control-mask'], ['visible'], \&show_help_window);
-$accel->connect(ord('e'), ['control-mask'], ['visible'], \&enqueue_video);
-$accel->connect(ord('l'), ['control-mask'], ['visible'], \&show_login_to_youtube_window);
-$accel->connect(ord('p'), ['control-mask'], ['visible'], \&show_preferences_window);
-$accel->connect(ord('q'), ['control-mask'], ['visible'], \&on_mainw_destroy);
-$accel->connect(ord('u'), ['control-mask'], ['visible'], \&show_users_list_window);
-$accel->connect(ord('y'), ['control-mask'], ['visible'], \&run_cli_lbry_viewer);
-$accel->connect(ord('d'), ['control-mask'], ['visible'], \&show_details_window);
+{
+    # Main window
+    my $accel = Gtk3::AccelGroup->new;
 
-#$accel->connect(ord('c'), ['control-mask'], ['visible'], \&show_comments_window);
-$accel->connect(ord('n'), ['control-mask'], ['visible'], \&display_subscription_videos);
-$accel->connect(ord('s'), ['control-mask'], ['visible'], \&add_user_to_favorites);
-$accel->connect(ord('r'), ['control-mask'], ['visible'], \&show_related_videos);
-$accel->connect(ord('g'), ['control-mask'], ['visible'], \&show_user_favorite_videos);
-$accel->connect(ord('m'), ['control-mask'], ['visible'], \&show_videos_from_selected_author);
-$accel->connect(ord('k'), ['control-mask'], ['visible'], \&show_playlists_from_selected_author);
-$accel->connect(ord('w'), ['control-mask'], ['visible'], \&display_watched_videos);
-$accel->connect(0xffff,   ['lock-mask'],    ['visible'], \&delete_selected_row);
-$accel->connect(0xffc8,   ['lock-mask'],    ['visible'], \&maximize_unmaximize_mainw);
-$mainw->add_accel_group($accel);
+    # 'CTRL+...' keybinds
+    $accel->connect(ord('h'), ['control-mask'], ['visible'], \&show_help_window);
+    $accel->connect(ord('e'), ['control-mask'], ['visible'], \&enqueue_video);
+    $accel->connect(ord('l'), ['control-mask'], ['visible'], \&show_login_to_youtube_window);
+    $accel->connect(ord('p'), ['control-mask'], ['visible'], \&show_preferences_window);
+    $accel->connect(ord('q'), ['control-mask'], ['visible'], \&on_mainw_destroy);
+    $accel->connect(ord('u'), ['control-mask'], ['visible'], \&show_users_list_window);
+    $accel->connect(ord('y'), ['control-mask'], ['visible'], \&run_cli_lbry_viewer);
+    $accel->connect(ord('d'), ['control-mask'], ['visible'], \&show_details_window);
+    ##$accel->connect(ord('c'), ['control-mask'], ['visible'], \&show_comments_window);
+    $accel->connect(ord('n'), ['control-mask'], ['visible'], \&display_subscription_videos);
+    $accel->connect(ord('s'), ['control-mask'], ['visible'], \&add_user_to_favorites);
+    $accel->connect(ord('r'), ['control-mask'], ['visible'], \&show_related_videos);
+    $accel->connect(ord('g'), ['control-mask'], ['visible'], \&show_user_favorite_videos);
+    $accel->connect(ord('m'), ['control-mask'], ['visible'], \&show_videos_from_selected_author);
+    $accel->connect(ord('k'), ['control-mask'], ['visible'], \&show_playlists_from_selected_author);
+    $accel->connect(ord('w'), ['control-mask'], ['visible'], \&display_watched_videos);
+
+    # 'DEL' key
+    $accel->connect(0xffff, ['lock-mask'], ['visible'], \&remove_selected_row);
+
+    # 'F11' key
+    $accel->connect(0xffc8, ['lock-mask'], ['visible'], \&maximize_unmaximize_mainw);
+
+    $mainw->add_accel_group($accel);
+}
+
+{
+    # "Saved channels" window
+    my $accel = Gtk3::AccelGroup->new;
+
+    # 'DEL' key
+    $accel->connect(0xffff, ['lock-mask'], ['visible'], \&remove_selected_username);
+
+    $users_list_window->add_accel_group($accel);
+}
 
 # Support for navigating back and forth using the side buttons of the mouse
 $mainw->signal_connect(
@@ -1626,27 +1642,37 @@ $mainw->signal_connect(
     }
 );
 
-# Other windows (ESC key to close them)
-$accel = Gtk3::AccelGroup->new;
-$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_users_list_window);
-$users_list_window->add_accel_group($accel);
+{
+    # Other windows (ESC key to close them)
+    my $accel = Gtk3::AccelGroup->new;
+    $accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_users_list_window);
+    $users_list_window->add_accel_group($accel);
+}
 
-$accel = Gtk3::AccelGroup->new;
-$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_feeds_window);
-$feeds_window->add_accel_group($accel);
+{
+    my $accel = Gtk3::AccelGroup->new;
+    $accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_feeds_window);
+    $feeds_window->add_accel_group($accel);
+}
 
-$accel = Gtk3::AccelGroup->new;
-$accel->connect(0xff1b,   ['lock-mask'],    ['visible'], \&hide_preferences_window);
-$accel->connect(ord('s'), ['control-mask'], ['visible'], \&save_configuration);
-$prefernces_window->add_accel_group($accel);
+{
+    my $accel = Gtk3::AccelGroup->new;
+    $accel->connect(0xff1b,   ['lock-mask'],    ['visible'], \&hide_preferences_window);
+    $accel->connect(ord('s'), ['control-mask'], ['visible'], \&save_configuration);
+    $prefernces_window->add_accel_group($accel);
+}
 
-$accel = Gtk3::AccelGroup->new;
-$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_help_window);
-$help_window->add_accel_group($accel);
+{
+    my $accel = Gtk3::AccelGroup->new;
+    $accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_help_window);
+    $help_window->add_accel_group($accel);
+}
 
-$accel = Gtk3::AccelGroup->new;
-$accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_details_window);
-$details_window->add_accel_group($accel);
+{
+    my $accel = Gtk3::AccelGroup->new;
+    $accel->connect(0xff1b, ['lock-mask'], ['visible'], \&hide_details_window);
+    $details_window->add_accel_group($accel);
+}
 
 # ------------------ Authentication ------------------ #
 
@@ -1825,7 +1851,7 @@ sub save_configuration {
     return 1;
 }
 
-sub delete_selected_row {
+sub remove_selected_row {
     my (undef, $iter) = get_selected_entry_code();
     $iter // return;
     $liststore->remove($iter);
@@ -2068,39 +2094,6 @@ sub set_usernames {
                                    ),
                              );
     }
-}
-
-sub save_channel {
-    my $channel_name = $save_channel_name_entry->get_text;
-    my $channel_id   = $save_channel_id_entry->get_text;
-
-    # Validate the channel id
-    if (defined($channel_id) and $channel_id =~ /$valid_channel_id_re/) {
-
-        $channel_id = $+{channel_id};
-
-        # Get the channel name when empty
-        if (not defined($channel_name) or not $channel_name =~ /\S/) {
-            $channel_name = $yv_obj->channel_title_from_id($channel_id) // die "Invalid channel ID: <<$channel_id>>";
-        }
-    }
-    elsif (defined($channel_name) and $channel_name =~ /$valid_channel_id_re/) {
-
-        $channel_name = $+{channel_id};
-        $channel_id   = $yv_obj->channel_id_from_username($channel_name);
-
-        if (not defined $channel_id) {
-            die "Can't get channel ID from username: <<$channel_name>>";
-        }
-    }
-    elsif (defined($channel_id) and $channel_id =~ /\S/) {
-        die "Invalid channel ID: <<$channel_id>>";
-    }
-    else {
-        return;
-    }
-
-    save_channel_by_id($channel_id, $channel_name);
 }
 
 sub save_channel_by_id {

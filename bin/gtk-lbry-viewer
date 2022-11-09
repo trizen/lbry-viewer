@@ -2428,7 +2428,13 @@ sub search {
     }
 
     my $type = $search_for_combobox->get_active_text;
-    display_results($yv_obj->search_for($type, $keywords));
+
+    if ($keywords =~ /^\s*\z/) {
+        display_results($yv_obj->popular_videos);
+    }
+    else {
+        display_results($yv_obj->search_for($type, $keywords));
+    }
 
     return 1;
 }

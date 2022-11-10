@@ -975,6 +975,14 @@ sub lbry_channel_uploads {
     my $hash    = $self->_get_librarian_data($url, %args) // return;
     my @results = $self->_extract_search_results($hash, %args);
 
+    # Sort the results by published date
+    @results = sort { ($b->{publishDate} // 0) <=> ($a->{publishDate} // 0) } @results;
+
+    # Popular videos (on the current page)
+    if (defined($args{sort_by}) and $args{sort_by} eq 'popular') {
+        @results = sort { ($b->{viewCount} // 0) <=> ($a->{viewCount} // 0) } @results;
+    }
+
     $self->_prepare_results_for_return(\@results, %args, url => $url);
 }
 

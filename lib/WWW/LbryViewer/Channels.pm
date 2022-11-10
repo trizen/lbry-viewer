@@ -52,9 +52,7 @@ sub popular_videos {
     }
 
     # TODO: implement support for popular LBRY videos for a channel
-    return $self->videos_from_channel_id($channel_id);
-
-    if (my $results = $self->yt_channel_uploads($channel_id, sort_by => 'popular')) {
+    if (my $results = $self->lbry_channel_uploads($channel_id, sort_by => 'popular')) {
         return $results;
     }
 

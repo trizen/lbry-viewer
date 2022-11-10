@@ -561,6 +561,8 @@ sub default_channels {
                     '@TheLinuxExperiment:e' => 'The Linux Experiment',
                     '@techlore:3'           => 'Techlore',
                     '@RobBraxmanTech:6'     => 'Rob Braxman Tech',
+                    '@gotbletu'             => 'gotbletu',
+                    '@academyofideas'       => 'Academy of Ideas',
                    );
 
     my @channels = map { [$_, $channels{$_}] } keys %channels;

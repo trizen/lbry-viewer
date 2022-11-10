@@ -998,36 +998,6 @@ TRICKS
 
 sub examples {
     print <<"EXAMPLES";
-==== COMMAND LINE EXAMPLES ====
-
-Command: $execname -A -n russian music
-Results: play all the video results (-A)
-         only audio, no video (-n)
-         search for "russian music"
-Note:    -A will include the videos from the next pages as well.
-
-Command: $execname --comments 'https://www.youtube.com/watch?v=U6_8oIPFREY'
-Results: show video comments for a specific video URL or videoID.
-
-Command: $execname --results=5 -up=khanacademy
-Results: the most recent 5 playlists by a specific author (-up).
-
-Command: $execname --author=MIT atom
-Results: search only in videos by a specific author.
-
-Command: $execname -S=vsauce
-Results: get the subscriptions for a username.
-
-Command: $execname cats --order=view_count --duration=short
-Results: search for 'cats' videos, ordered by ViewCount and short duration.
-
-Command: $execname -sc math lessons
-Results: search for LBRY channels.
-
-Command: $execname -uf=Google
-Results: show the latest favorite videos by a user.
-
-
 ==== USER INPUT EXAMPLES ====
 
 A STDIN option can begin with ':', ';' or '='.
@@ -2103,7 +2073,7 @@ sub warn_cant_do {
     my ($action, @ids) = @_;
 
     foreach my $videoID (@ids) {
-        warn colored("\n[!] Can't $action video: " . sprintf($CONFIG{lbry_video_url}, $videoID), 'bold red') . "\n";
+        warn colored("\n[!] Can't $action video: " . sprintf($opt{lbry_video_url}, $videoID), 'bold red') . "\n";
     }
 }
 
@@ -2469,7 +2439,7 @@ sub print_channels {
                 }
             }
 
-            # :r=i, :rm=i, :remove=i, :unsubscribe=i
+            # :r=i, :rm=i, :remove=i
             elsif ($opt =~ /^(?:r|rm|remove)${digit_or_equal_re}(.*)/) {
                 if (my @nums = get_valid_numbers($#{$channels}, $1)) {
                     remove_saved_channels(map { $yv_utils->get_channel_id($channels->[$_]) } @nums);
@@ -2479,7 +2449,7 @@ sub print_channels {
                 }
             }
 
-            # :unsub=i
+            # :unsub=i, :unsubscribe=i
             elsif ($opt =~ /^(?:unsub(?:scribe)?)${digit_or_equal_re}(.*)/) {
                 if (my @nums = get_valid_numbers($#{$channels}, $1)) {
                     unsubscribe_from_channels(map { $yv_utils->get_channel_id($channels->[$_]) } @nums);
@@ -2667,30 +2637,9 @@ sub update_channel_file {
 sub _remove_channels_from_file {
     my ($channel_ids, $file) = @_;
 
-    open(my $fh, '<:utf8', $file) or do {
-        warn "[!] Can't open file <<$file>> for reading: $!\n";
-        return;
-    };
-
-    my %channels;
-
-    while (defined(my $line = <$fh>)) {
-        if ($line =~ /^([a-zA-Z0-9_-]+) (.+)/) {
-            my ($channel_id, $channel_title) = ($1, $2);
-
-            if ($yv_utils->is_channelID($channel_id)) {
-                $channels{$channel_id} = $channel_title;
-            }
-            else {
-                warn "[!] Invalid channel ID: $channel_id\n";
-            }
-        }
-    }
-
-    close $fh;
+    my %channels = map { @$_ } $yv_utils->read_channels_from_file($file);
 
     my $removed = 0;
-
     foreach my $channel_id (@$channel_ids) {
         if (exists $channels{$channel_id}) {
             say ":: Removing: $channel_id" if $yv_obj->get_debug;
@@ -3676,7 +3625,7 @@ sub print_playlist_info {
         ## local playlist
     }
     else {
-        say STDOUT $hr, "\n", _bold_color('=> URL: '), sprintf("https://www.youtube.com/playlist?list=%s", $id);
+        say STDOUT $hr, "\n", _bold_color('=> URL: '), sprintf($opt{lbry_video_url}, $id);
     }
 
     my $title        = $yv_utils->get_title($playlist);
@@ -3723,7 +3672,7 @@ sub print_channel_info {
            _bold_color('=> URL: ')
           );
 
-    print STDOUT sprintf("https://www.youtube.com/channel/%s", $yv_utils->get_channel_id($channel));
+    print STDOUT sprintf($opt{lbry_video_url}, $yv_utils->get_channel_id($channel));
 
     my $title        = $yv_utils->get_channel_title($channel);
     my $title_length = length($title);
@@ -3785,7 +3734,7 @@ sub print_video_info {
            _bold_color('=> URL: ')
           );
 
-    print STDOUT sprintf($CONFIG{lbry_video_url}, $yv_utils->get_video_id($video));
+    print STDOUT sprintf($opt{lbry_video_url}, $yv_utils->get_video_id($video));
 
     my $title        = $yv_utils->get_title($video);
     my $title_length = length($title);
@@ -4163,7 +4112,12 @@ sub print_videos {
                 if (my @nums = get_valid_numbers($#{$videos}, $1)) {
                     foreach my $num (@nums) {
                         local $opt{show_video_info} = 1;
-                        print_video_info($videos->[$num]);
+                        if ($videos->[$num]->{type} eq 'video') {
+                            print_video_info($videos->[$num]);
+                        }
+                        elsif ($videos->[$num]->{type} eq 'channel') {
+                            print_channel_info($videos->[$num]);
+                        }
                     }
                     press_enter_to_continue();
                 }
@@ -4692,7 +4646,7 @@ Remember watched videos. Watched videos can be listed with:
 
 File where to save the video IDs of watched/downloaded videos when C<watch_history> is set to a true value.
 
-=head2 youtube_video_url
+=head2 lbry_video_url
 
 Format for C<sprintf()> for constructing an LBRY video URL given the video ID.
 

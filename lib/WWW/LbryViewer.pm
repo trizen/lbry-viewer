@@ -315,7 +315,6 @@ sub set_lwp_useragent {
     $agent->default_header('Accept-Encoding' => $accepted_encodings);
     $agent->default_header('Accept'          => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8');
     $agent->default_header('Accept-Language' => 'en-US,en;q=0.5');
-    $agent->default_header('DNT'             => '1');
     $agent->default_header('Connection'      => 'keep-alive');
     $agent->default_header('Upgrade-Insecure-Requests' => '1');
     $agent->conn_cache($cache);

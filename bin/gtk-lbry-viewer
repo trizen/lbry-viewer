@@ -1070,6 +1070,7 @@ sub new_image_from_pixbuf {
     $gui->get_object('username_list')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $user_icon_pixbuf));
     $gui->get_object('uploads_button')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $user_icon_pixbuf));
     $gui->get_object('button6')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $feed_icon_pixbuf));
+    $gui->get_object('subscription_videos')->set_image(new_image_from_pixbuf('icon_from_pixbuf', $feed_icon_pixbuf));
 }
 
 # Treeview signals
@@ -1258,7 +1259,7 @@ sub menu_popup {
                 my $item = 'Gtk3::ImageMenuItem'->new("LBRY page");
                 $item->signal_connect(activate => sub { open_external_url(make_lbry_url('video', $video_id)) });
                 $item->set_property(tooltip_text => "Open the LBRY page of this video");
-                $item->set_image('Gtk3::Image'->new_from_icon_name("applications-internet-symbolic", q{menu}));
+                $item->set_image('Gtk3::Image'->new_from_icon_name("web-browser-symbolic", q{menu}));
                 $item->show;
                 $video->append($item);
             }
@@ -1397,7 +1398,7 @@ sub menu_popup {
             my $item = 'Gtk3::ImageMenuItem'->new("LBRY page");
             $item->signal_connect(activate => sub { open_external_url(make_lbry_url('channel', $channel_id)) });
             $item->set_property(tooltip_text => "Open the LBRY page of this channel");
-            $item->set_image('Gtk3::Image'->new_from_icon_name("applications-internet-symbolic", q{menu}));
+            $item->set_image('Gtk3::Image'->new_from_icon_name("web-browser-symbolic", q{menu}));
             $item->show;
             $author->append($item);
         }

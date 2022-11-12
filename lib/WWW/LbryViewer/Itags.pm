@@ -45,12 +45,14 @@ sub get_itags {
 
         '1080' => [{value => '1080p',    format => 'mp4'},
                    {value => 'hls-4026', format => 'mp4'},
+                   {value => 'hls-3660', format => 'mp4'},
                    {value => 'hls-316',  format => 'mp4'},
                    {value => 'hls-4432', format => 'mp4'},
                   ],
 
         '720' => [{value => "720p",     format => 'mp4'},
                   {value => "hls-176",  format => 'mp4'},
+                  {value => "hls-756",  format => 'mp4'},
                   {value => "hls-246",  format => 'mp4'},
                   {value => "hls-660",  format => 'mp4'},
                   {value => "hls-2890", format => 'mp4'},

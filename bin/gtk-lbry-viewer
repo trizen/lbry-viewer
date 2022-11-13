@@ -1412,6 +1412,30 @@ sub menu_popup {
         }
     }
 
+    # Separator
+    {
+        my $item = 'Gtk3::SeparatorMenuItem'->new;
+        $item->show;
+        $menu->append($item);
+    }
+
+    # Copy LBRY URL
+    {
+        my $item = 'Gtk3::ImageMenuItem'->new("Copy LBRY URL");
+        $item->set_property(tooltip_text => "Copy the LBRY URL for this entry");
+        $item->set_image('Gtk3::Image'->new_from_icon_name("edit-copy-symbolic", q{menu}));
+        $item->signal_connect(
+            activate => sub {
+                my $id        = $liststore->get($iter, 3);
+                my $display   = Gtk3::Gdk::Display::get_default();
+                my $clipboard = Gtk3::Clipboard::get_default($display);
+                $clipboard->set_text(make_lbry_url($type, $id));
+            }
+        );
+        $item->show;
+        $menu->append($item);
+    }
+
     if (@VIDEO_QUEUE) {
 
         # Separator

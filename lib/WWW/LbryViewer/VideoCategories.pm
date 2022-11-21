@@ -31,16 +31,18 @@ sub video_categories {
             {id => "popculture",   title => "Pop Culture"},
             {id => "artists",      title => "Artists"},
             {id => "education",    title => "Education"},
-            {id => "comedy",       title => "Comedy"},
             {id => "lifestyle",    title => "Lifestyle"},
-            {id => "music",        title => "Music"},
-            {id => "sports",       title => "Sports"},
+            {id => "spooky",       title => "Spooky"},
             {id => "gaming",       title => "Gaming"},
             {id => "tech",         title => "Tech"},
+            {id => "comedy",       title => "Comedy"},
+            {id => "music",        title => "Music"},
+            {id => "sports",       title => "Sports"},
             {id => "universe",     title => "Universe"},
             {id => "finance",      title => "Finance 2.0"},
             {id => "spirituality", title => "Spirituality"},
             {id => "news",         title => "News & Politics"},
+            {id => "rabbithole",   title => "Rabbit Hole"},
            ];
 }
 

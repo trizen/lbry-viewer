@@ -2529,13 +2529,8 @@ sub get_code {
                     $results = $yv_obj->next_page($code, $next_page_token);
                 }
 
-                if ($yv_utils->has_entries($results)) {
-                    my $label = '<big><b>' . ('=' x 20) . '</b></big>';
-                    $liststore->set($iter, 0 => $label, 3 => "");
-                }
-                else {
-                    $liststore->remove($iter);
-                    die "This is the last page!\n";
+                if (not $yv_utils->has_entries($results)) {
+                    die "This may be the last page!\n";
                 }
 
                 display_results($results);

@@ -413,6 +413,16 @@ sub lwp_get {
         }
     }
 
+    my $cookie_jar = $self->{lwp}->cookie_jar;
+    my $domain     = $url;
+
+    if ($domain =~ m{^https?://(.*?)/}) {
+        $domain = $1;
+    }
+
+    # Set the NSFW cookie
+    $cookie_jar->set_cookie(0, "nsfw", ($self->get_nsfw ? "true" : "false"), "/", $domain, undef, 0, "", 3806952123, 0, {});
+
     my $response = do {
         my $r;
 

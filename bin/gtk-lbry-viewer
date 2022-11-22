@@ -195,6 +195,7 @@ my %CONFIG = (
 
     # GUI options
     clear_text_entries_on_click => 0,
+    get_thumbnails_in_parallel  => 0,
     show_thumbs                 => 1,
     clear_search_list           => 1,
     default_notebook_page       => 1,
@@ -2982,8 +2983,86 @@ sub display_results {
         }
     }
 
-    # Would be nice if we could retrieve the thumbnails in parallel
-    if ($CONFIG{show_thumbs}) {
+    # Retrieve the thumbnails in parallel
+    if ($CONFIG{show_thumbs} and $CONFIG{get_thumbnails_in_parallel}) {
+
+        my @missing_thumbnails;
+        foreach my $row (@rows) {
+            my ($entry, $liststore, $iter) = @$row;
+            $liststore->set($iter, [1], [$default_thumb]);
+            my $thumbnail_url  = $yv_utils->get_thumbnail_url($entry, $CONFIG{thumbnail_type});
+            my $thumbnail_data = get_thumbnail_from_cache($thumbnail_url) // do {
+                push(
+                     @missing_thumbnails,
+                     scalar {
+                             entry     => $entry,
+                             liststore => $liststore,
+                             iter      => $iter,
+                             url       => $thumbnail_url,
+                            }
+                    );
+                next;
+            };
+            my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
+            my $pixbuf =
+              get_pixbuf_thumbnail_from_content($thumbnail_data, $thumbnail_url, ($square_format ? (160, 160) : ()));
+            $liststore->set($iter, [1], [$pixbuf]);
+        }
+
+        if (@missing_thumbnails) {
+
+            if ($yv_obj->get_debug) {
+                say STDERR ":: Retrieving thumbnails: ", scalar(@missing_thumbnails);
+            }
+
+            my %table;
+
+            foreach my $entry (@missing_thumbnails) {
+                $table{$entry->{url}} = $entry;
+            }
+
+            require Parallel::ForkManager;
+
+            # Max number of processes for parallel downloads
+            my $pm = Parallel::ForkManager->new(30);
+
+            # Data structure retrieval and handling
+            $pm->run_on_finish(
+                sub {
+                    my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
+
+                    if (defined($data_structure_reference)) {
+                        my $thumbnail_data = $$data_structure_reference;
+
+                        my $row           = $table{$ident};
+                        my $entry         = $row->{entry};
+                        my $liststore     = $row->{liststore};
+                        my $iter          = $row->{iter};
+                        my $thumbnail_url = $row->{url};
+                        my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
+
+                        if (defined($thumbnail_data)) {
+                            my $pixbuf =
+                              get_pixbuf_thumbnail_from_content($thumbnail_data, $thumbnail_url,
+                                                                ($square_format ? (160, 160) : ()));
+                            $liststore->set($iter, [1], [$pixbuf]);
+                        }
+                    }
+                }
+            );
+
+            foreach my $row (@missing_thumbnails) {
+                my $thumbnail_url = $row->{url};
+                $thumbnail_url || next;
+                $thumbnail_url =~ m{\S} or next;
+                $pm->start($row->{url}) and next;    # do the fork
+                my $data = $yv_obj->lwp_get($thumbnail_url);
+                $pm->finish(0, \$data);
+            }
+            $pm->wait_all_children;
+        }
+    }
+    elsif ($CONFIG{show_thumbs}) {
         foreach my $row (@rows) {
             my ($entry, $liststore, $iter) = @$row;
             set_thumbnail($entry, $liststore, $iter);

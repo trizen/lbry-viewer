@@ -195,7 +195,6 @@ my %CONFIG = (
 
     # GUI options
     clear_text_entries_on_click => 0,
-    get_thumbnails_in_parallel  => 0,
     show_thumbs                 => 1,
     clear_search_list           => 1,
     default_notebook_page       => 1,
@@ -205,6 +204,10 @@ my %CONFIG = (
     mainw_centered              => 0,
     hpaned_width                => 250,
     hpaned_position             => 420,
+
+    # Parallel options
+    get_thumbnails_in_parallel    => 0,
+    get_subscriptions_in_parallel => 0,
 
     # LBRY options
     split_videos   => 1,
@@ -2819,42 +2822,90 @@ sub get_subscription_video_results {
         return get_results_from_list(entries => []);
     }
 
-    my %subscriptions;
-
     require Time::Piece;
     my $time = Time::Piece->new();
 
     my @items;
-    foreach my $i (0 .. $#channels) {
 
-        local $| = 1;
-        printf("[%d/%d] Retrieving info for $channels[$i][1]...\n", $i + 1, $#channels + 1);
+    if ($CONFIG{get_subscriptions_in_parallel} and eval { require Parallel::ForkManager; 1 }) {
 
-        my $id      = $channels[$i][0]      // next;
-        my $uploads = $yv_obj->uploads($id) // next;
+        # Max number of processes for parallel downloads
+        my $pm = Parallel::ForkManager->new(30);
 
-        my $videos = $uploads->{results} // [];
+        $pm->set_waitpid_blocking_sleep(0.1);
 
-        if (ref($videos) eq 'HASH' and exists $videos->{videos}) {
-            $videos = $videos->{videos};
+        # Data structure retrieval and handling
+        $pm->run_on_finish(
+            sub {
+                my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $videos) = @_;
+                if (defined($videos) and ref($videos) eq 'ARRAY') {
+                    push @items, @$videos;
+                }
+            }
+        );
+
+        $yv_obj->get_librarian_url();    # init Librarian instances
+
+        foreach my $i (0 .. $#channels) {
+
+            printf("[%d/%d] Retrieving info for $channels[$i][1]...\n", $i + 1, $#channels + 1);
+
+            my $id  = $channels[$i][0] // next;
+            my $pid = $pm->start($id)  // next;
+            next if ($pid != 0);
+
+            my $uploads = $yv_obj->uploads($id) // next;
+            my $videos  = $uploads->{results}   // [];
+
+            if (ref($videos) eq 'HASH' and exists $videos->{videos}) {
+                $videos = $videos->{videos};
+            }
+
+            if (ref($videos) eq 'HASH' and exists $videos->{entries}) {
+                $videos = $videos->{entries};
+            }
+
+            if (ref($videos) ne 'ARRAY') {
+                next;
+            }
+
+            foreach my $video (@$videos) {
+                $video->{timestamp} = [@$time];
+            }
+
+            $pm->finish(0, $videos);
         }
 
-        if (ref($videos) eq 'HASH' and exists $videos->{entries}) {
-            $videos = $videos->{entries};
+        $pm->wait_all_children;
+    }
+    else {
+        foreach my $i (0 .. $#channels) {
+
+            printf("[%d/%d] Retrieving info for $channels[$i][1]...\n", $i + 1, $#channels + 1);
+
+            my $id      = $channels[$i][0]      // next;
+            my $uploads = $yv_obj->uploads($id) // next;
+
+            my $videos = $uploads->{results} // [];
+
+            if (ref($videos) eq 'HASH' and exists $videos->{videos}) {
+                $videos = $videos->{videos};
+            }
+
+            if (ref($videos) eq 'HASH' and exists $videos->{entries}) {
+                $videos = $videos->{entries};
+            }
+
+            if (ref($videos) ne 'ARRAY') {
+                next;
+            }
+
+            foreach my $video (@$videos) {
+                $video->{timestamp} = [@$time];
+            }
+
+            push @items, @$videos;
         }
-
-        if (ref($videos) ne 'ARRAY') {
-            next;
-        }
-
-        $subscriptions{$id} = 1;
-        $subscriptions{lc($id)} = 1;
-
-        foreach my $video (@$videos) {
-            $video->{timestamp} = [@$time];
-        }
-
-        push @items, @$videos;
     }
 
     my $subscriptions_data = [];
@@ -2870,6 +2921,8 @@ sub get_subscription_video_results {
         my %seen;
         grep { !$seen{$yv_utils->get_video_id($_)}++ } @$subscriptions_data;
     };
+
+    my %subscriptions = map { @$_ } @channels;
 
     # Remove videos from unsubscribed channels
     @$subscriptions_data = grep {
@@ -2984,7 +3037,7 @@ sub display_results {
     }
 
     # Retrieve the thumbnails in parallel
-    if ($CONFIG{show_thumbs} and $CONFIG{get_thumbnails_in_parallel}) {
+    if ($CONFIG{get_thumbnails_in_parallel} and $CONFIG{show_thumbs} and eval { require Parallel::ForkManager; 1 }) {
 
         my @missing_thumbnails;
         foreach my $row (@rows) {
@@ -3020,10 +3073,10 @@ sub display_results {
                 push @{$table{$entry->{url}}}, $entry;
             }
 
-            require Parallel::ForkManager;
-
             # Max number of processes for parallel downloads
             my $pm = Parallel::ForkManager->new(30);
+
+            $pm->set_waitpid_blocking_sleep(0.1);
 
             # Data structure retrieval and handling
             $pm->run_on_finish(
@@ -3056,11 +3109,19 @@ sub display_results {
                 $thumbnail_url || next;
                 $thumbnail_url =~ m{^\&} and next;
                 $thumbnail_url =~ m{^\S} or next;
-                $pm->start($thumbnail_url) and next;    # do the fork
+                my $pid = $pm->start($thumbnail_url) // next;
+                next if ($pid != 0);
                 my $data = $yv_obj->lwp_get($thumbnail_url);
                 $pm->finish(0, \$data);
             }
-            $pm->wait_all_children;
+
+            Glib::Idle->add(
+                sub {
+                    $pm->wait_all_children;
+                },
+                [],
+                Glib::G_PRIORITY_LOW
+            );
         }
     }
     elsif ($CONFIG{show_thumbs}) {

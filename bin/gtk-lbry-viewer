@@ -3016,9 +3016,8 @@ sub display_results {
             }
 
             my %table;
-
             foreach my $entry (@missing_thumbnails) {
-                $table{$entry->{url}} = $entry;
+                push @{$table{$entry->{url}}}, $entry;
             }
 
             require Parallel::ForkManager;
@@ -3031,17 +3030,19 @@ sub display_results {
                 sub {
                     my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $data_structure_reference) = @_;
 
-                    if (defined($data_structure_reference)) {
+                    if (defined($data_structure_reference) and defined($ident) and exists($table{$ident})) {
                         my $thumbnail_data = $$data_structure_reference;
 
-                        my $row           = $table{$ident};
-                        my $entry         = $row->{entry};
-                        my $liststore     = $row->{liststore};
-                        my $iter          = $row->{iter};
-                        my $thumbnail_url = $row->{url};
-                        my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
+                        foreach my $row (@{$table{$ident}}) {
 
-                        if (defined($thumbnail_data)) {
+                            defined($thumbnail_data) or next;
+
+                            my $entry         = $row->{entry};
+                            my $liststore     = $row->{liststore};
+                            my $iter          = $row->{iter};
+                            my $thumbnail_url = $row->{url};
+                            my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
+
                             my $pixbuf =
                               get_pixbuf_thumbnail_from_content($thumbnail_data, $thumbnail_url,
                                                                 ($square_format ? (160, 160) : ()));
@@ -3051,11 +3052,11 @@ sub display_results {
                 }
             );
 
-            foreach my $row (@missing_thumbnails) {
-                my $thumbnail_url = $row->{url};
+            foreach my $thumbnail_url (keys %table) {
                 $thumbnail_url || next;
-                $thumbnail_url =~ m{\S} or next;
-                $pm->start($row->{url}) and next;    # do the fork
+                $thumbnail_url =~ m{^\&} and next;
+                $thumbnail_url =~ m{^\S} or next;
+                $pm->start($thumbnail_url) and next;    # do the fork
                 my $data = $yv_obj->lwp_get($thumbnail_url);
                 $pm->finish(0, \$data);
             }

@@ -206,8 +206,9 @@ my %CONFIG = (
     hpaned_position             => 420,
 
     # Parallel options
-    get_thumbnails_in_parallel    => 0,
-    get_subscriptions_in_parallel => 0,
+    get_thumbnails_in_parallel     => 0,
+    get_subscriptions_in_parallel  => 0,
+    get_streaming_urls_in_parallel => 0,
 
     # LBRY options
     split_videos   => 1,
@@ -2829,7 +2830,7 @@ sub get_subscription_video_results {
 
     if ($CONFIG{get_subscriptions_in_parallel} and eval { require Parallel::ForkManager; 1 }) {
 
-        # Max number of processes for parallel downloads
+        # Max number of processes
         my $pm = Parallel::ForkManager->new(30);
 
         $pm->set_waitpid_blocking_sleep(0.1);
@@ -3073,7 +3074,7 @@ sub display_results {
                 push @{$table{$entry->{url}}}, $entry;
             }
 
-            # Max number of processes for parallel downloads
+            # Max number of processes
             my $pm = Parallel::ForkManager->new(30);
 
             $pm->set_waitpid_blocking_sleep(0.1);
@@ -3663,7 +3664,44 @@ sub save_watched_video {
 sub play_video {
     my ($video) = @_;
 
-    my $video_id  = $yv_utils->get_video_id($video);
+    my $video_id = $yv_utils->get_video_id($video);
+
+    if ($CONFIG{get_streaming_urls_in_parallel} and eval { require Parallel::ForkManager; 1 }) {
+
+        save_watched_video($video_id, $video);
+
+        # Max number of processes
+        my $pm = Parallel::ForkManager->new(1);
+
+        $pm->set_waitpid_blocking_sleep(0.1);
+
+        my $pid = $pm->start // return;
+        $pid == 0 or return 1;
+
+        my $streaming = get_streaming_url($video_id);
+
+        if (ref($streaming->{streaming}) ne 'HASH') {
+            $pm->finish;
+            $pm->reap_finished_children;
+            die "[!] Can't play this video: no streaming URL has been found!\n";
+        }
+
+        my $command = get_player_command($streaming, $video);
+
+        if ($yv_obj->get_debug) {
+            say "-> Resolution: $streaming->{resolution}";
+            say "-> Video itag: $streaming->{streaming}{itag}";
+            say "-> Audio itag: $streaming->{streaming}{__AUDIO__}{itag}" if exists $streaming->{streaming}{__AUDIO__};
+            say "-> Video type: $streaming->{streaming}{type}";
+            say "-> Audio type: $streaming->{streaming}{__AUDIO__}{type}" if exists $streaming->{streaming}{__AUDIO__};
+        }
+
+        execute_external_program($command);
+        $pm->finish;
+        $pm->reap_finished_children;
+        return 1;
+    }
+
     my $streaming = get_streaming_url($video_id);
 
     if (ref($streaming->{streaming}) ne 'HASH') {

@@ -2921,10 +2921,7 @@ sub get_subscription_video_results {
     my %subscriptions = map { @$_ } @channels;
 
     # Remove videos from unsubscribed channels
-    @$subscriptions_data = grep {
-             exists($subscriptions{$yv_utils->get_channel_id($_)})
-          or exists($subscriptions{lc($yv_utils->get_channel_title($_) // '')})
-    } @$subscriptions_data;
+    @$subscriptions_data = grep { exists($subscriptions{$yv_utils->get_channel_id($_)}) } @$subscriptions_data;
 
     # Order videos by newest first
     @$subscriptions_data =

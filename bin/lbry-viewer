@@ -2802,7 +2802,8 @@ sub print_local_subscription_videos {
     my @items;
 
     if ($opt{get_subscriptions_in_parallel} and eval { require Parallel::ForkManager; 1 }) {
-        print("Retrieving subscription videos...\n");
+
+        say ":: Retrieving subscription videos...";
 
         # Max number of processes
         my $pm = Parallel::ForkManager->new(30);

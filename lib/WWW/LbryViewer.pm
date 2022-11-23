@@ -88,13 +88,12 @@ my %valid_options = (
     ytdlp_max_replies  => {valid => qr/^(?:\d+|all)\z/, default => 0},
 
     # Booleans
-    nsfw                       => {valid => [1, 0], default => 0},
-    env_proxy                  => {valid => [1, 0], default => 1},
-    escape_utf8                => {valid => [1, 0], default => 0},
-    prefer_mp4                 => {valid => [1, 0], default => 0},
-    prefer_av1                 => {valid => [1, 0], default => 0},
-    force_fallback             => {valid => [1, 0], default => 0},
-    bypass_age_gate_with_proxy => {valid => [1, 0], default => 0},
+    nsfw           => {valid => [1, 0], default => 0},
+    env_proxy      => {valid => [1, 0], default => 1},
+    escape_utf8    => {valid => [1, 0], default => 0},
+    prefer_mp4     => {valid => [1, 0], default => 0},
+    prefer_av1     => {valid => [1, 0], default => 0},
+    force_fallback => {valid => [1, 0], default => 0},
 
     api_host => {valid => qr/\w/, default => "auto"},
 

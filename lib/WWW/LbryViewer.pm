@@ -301,10 +301,10 @@ sub set_lwp_useragent {
         env_proxy => (defined($self->get_http_proxy) ? 0 : $self->get_env_proxy),
     );
 
-    require LWP::ConnCache;
-    state $cache = LWP::ConnCache->new;
-    $cache->total_capacity(undef);    # no limit
-    $agent->conn_cache($cache);
+    #~ require LWP::ConnCache;
+    #~ state $cache = LWP::ConnCache->new;
+    #~ $cache->total_capacity(undef);    # no limit
+    #~ $agent->conn_cache($cache);
 
     state $accepted_encodings = do {
         require HTTP::Message;

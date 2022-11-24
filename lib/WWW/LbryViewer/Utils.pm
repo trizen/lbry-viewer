@@ -582,7 +582,7 @@ sub read_channels_from_file {
     my %channels = map { split(/ /, $_, 2) } grep { not /^#/ } grep { /\S\s+\S/ } $self->read_lines_from_file($file, $mode);
 
     # Filter valid channels and pair with channel ID with title
-    my @channels = map { [$_, $channels{$_}] } grep { defined($channels{$_}) } keys %channels;
+    my @channels = map { [$_, $channels{$_} =~ s/^\@//r] } grep { defined($channels{$_}) } keys %channels;
 
     # Sort channels by channel name
     @channels = sort { CORE::fc($a->[1]) cmp CORE::fc($b->[1]) } @channels;

@@ -2832,7 +2832,7 @@ sub get_subscription_video_results {
         $pm->run_on_finish(
             sub {
                 my ($pid, $exit_code, $ident, $exit_signal, $core_dump, $videos) = @_;
-                if (defined($videos) and ref($videos) eq 'ARRAY') {
+                if ($exit_code == 0 and defined($videos) and ref($videos) eq 'ARRAY') {
                     push @items, @$videos;
                 }
             }
@@ -2848,8 +2848,11 @@ sub get_subscription_video_results {
             my $pid = $pm->start($id)  // next;
             next if ($pid != 0);
 
-            my $uploads = $yv_obj->uploads($id) // next;
-            my $videos  = $uploads->{results}   // [];
+            my $uploads = $yv_obj->uploads($id) // do {
+                $pm->finish(1, []);
+                next;
+            };
+            my $videos = $uploads->{results} // [];
 
             if (ref($videos) eq 'HASH' and exists $videos->{videos}) {
                 $videos = $videos->{videos};
@@ -2860,6 +2863,7 @@ sub get_subscription_video_results {
             }
 
             if (ref($videos) ne 'ARRAY') {
+                $pm->finish(1, []);
                 next;
             }
 

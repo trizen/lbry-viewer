@@ -5,6 +5,21 @@
 
 [CHANGELOG]
 
+Version 0.0.8
+
+- CLI: allow the `--novideo` option to be negated.
+- CLI: added the `get_subscriptions_in_parallel` config-option (disabled by default)
+- GUI: added the `get_streaming_urls_in_parallel` config-option (disabled by default)
+- GUI: added the `get_subscriptions_in_parallel` config-option (disabled by default)
+- GUI: added the `get_thumbnails_in_parallel` config-option (disabled by default)
+- GUI: added the right-click "Copy LBRY URL" menu entry.
+- GUI: no longer remove the "NEXT PAGE" entry after clicking it.
+- GUI: added the `DEL` keybind in the "Saved channels" window to remove the selected channel.
+- GUI: display featured videos when no search keywords are specified.
+- GUI: better performance for GIF thumbnails and very large thumbnails.
+- Fixed the NSFW flag for results past the first page.
+- Sort the videos from a channel by published date.
+
 Version 0.0.7
 
 - GUI: keep aspect ratio of thumbnails.

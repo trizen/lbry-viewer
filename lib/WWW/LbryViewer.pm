@@ -1093,7 +1093,7 @@ sub get_streaming_urls {
         $m3u8_url = HTML::Entities::decode_entities($m3u8_url);
 
         my $base_url   = substr($m3u8_url, 0, rindex($m3u8_url, '/') + 1);
-        my $content    = ($m3u8_url =~ m{^https?://} ? $self->lwp_get($m3u8_url) : '');
+        my $content    = ($m3u8_url =~ m{^https?://} ? $self->lwp_get($m3u8_url) : '') // '';
         my @paragraphs = split(/\R\s*\R/, $content);
 
         foreach my $para (@paragraphs) {

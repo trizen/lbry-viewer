@@ -288,9 +288,10 @@ sub normalize_filename {
         $title =~ s/: / - /g;
         $title =~ tr{:"*/?\\|}{;'+%!%%};    # "
         $title =~ tr/<>//d;
+        $title =~ s{%+}{%}g;
     }
     else {
-        $title =~ tr{/}{%};
+        $title =~ s{/+}{%}g;
     }
 
     my $basename = join(q{ }, split(q{ }, $title));

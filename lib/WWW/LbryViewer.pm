@@ -543,13 +543,6 @@ sub _static_librarian_instances {
     return [
             {
              cloudflare => 0,
-             country    => "\x{1F1E8}\x{1F1E6}\x{FE0F} CA, \x{1F1F3}\x{1F1F1} NL",
-             live       => 1,
-             name       => "lbry.bcow.xyz",
-             url        => "https://lbry.bcow.xyz",
-            },
-            {
-             cloudflare => 0,
              country    => "\x{1F1EF}\x{1F1F5} JP",
              live       => 1,
              name       => "odysee.076.ne.jp",
@@ -592,24 +585,24 @@ sub _static_librarian_instances {
             },
             {
              cloudflare => 0,
-             country    => "\x{1F1F2}\x{1F1E9} MD",
-             live       => 0,
-             name       => "lbry.sytes.net",
-             url        => "https://lbry.sytes.net",
-            },
-            {
-             cloudflare => 0,
-             country    => "\x{1F1E8}\x{1F1FF} CZ",
-             live       => 1,
-             name       => "lbry.webhop.me",
-             url        => "https://lbry.webhop.me",
-            },
-            {
-             cloudflare => 0,
              country    => "\x{1F1F7}\x{1F1FA} RU",
              live       => 0,
              name       => "lbry.mywire.org",
              url        => "https://lbry.mywire.org",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1F8}\x{1F1F0} SK",
+             live       => 0,
+             name       => "lbry.ooguy.com",
+             url        => "https://lbry.ooguy.com",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1E7}\x{1F1F7} BR",
+             live       => 1,
+             name       => "lbn.frail.duckdns.org",
+             url        => "https://lbn.frail.duckdns.org",
             },
            ];
 }

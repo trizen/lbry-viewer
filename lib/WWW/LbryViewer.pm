@@ -537,6 +537,83 @@ sub _append_url_args {
       : $url;
 }
 
+sub _static_librarian_instances {
+    my ($self) = @_;
+
+    return [
+            {
+             cloudflare => 0,
+             country    => "\x{1F1E8}\x{1F1E6}\x{FE0F} CA, \x{1F1F3}\x{1F1F1} NL",
+             live       => 1,
+             name       => "lbry.bcow.xyz",
+             url        => "https://lbry.bcow.xyz",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1EF}\x{1F1F5} JP",
+             live       => 1,
+             name       => "odysee.076.ne.jp",
+             url        => "https://odysee.076.ne.jp",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1E9}\x{1F1EA} DE",
+             live       => 1,
+             name       => "librarian.pussthecat.org",
+             url        => "https://librarian.pussthecat.org",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1EB}\x{1F1F7} FR",
+             live       => 1,
+             name       => "lbry.projectsegfau.lt",
+             url        => "https://lbry.projectsegfau.lt",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1E8}\x{1F1E6} CA",
+             live       => 0,
+             name       => "librarian.esmailelbob.xyz",
+             url        => "https://librarian.esmailelbob.xyz",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1E8}\x{1F1E6} CA",
+             live       => 0,
+             name       => "lbry.vern.cc",
+             url        => "https://lbry.vern.cc",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1FA}\x{1F1F8} US",
+             live       => 0,
+             name       => "lbry.slipfox.xyz",
+             url        => "https://lbry.slipfox.xyz",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1F2}\x{1F1E9} MD",
+             live       => 0,
+             name       => "lbry.sytes.net",
+             url        => "https://lbry.sytes.net",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1E8}\x{1F1FF} CZ",
+             live       => 1,
+             name       => "lbry.webhop.me",
+             url        => "https://lbry.webhop.me",
+            },
+            {
+             cloudflare => 0,
+             country    => "\x{1F1F7}\x{1F1FA} RU",
+             live       => 0,
+             name       => "lbry.mywire.org",
+             url        => "https://lbry.mywire.org",
+            },
+           ];
+}
+
 sub get_librarian_instances {
     my ($self) = @_;
 
@@ -573,78 +650,7 @@ sub get_librarian_instances {
             say STDERR "[!] Could not fetch the list of Librarian instances...\n";
         }
 
-        return [
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1E8}\x{1F1E6}\x{FE0F} CA, \x{1F1F3}\x{1F1F1} NL",
-                 live       => 1,
-                 name       => "lbry.bcow.xyz",
-                 url        => "https://lbry.bcow.xyz",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1EF}\x{1F1F5} JP",
-                 live       => 1,
-                 name       => "odysee.076.ne.jp",
-                 url        => "https://odysee.076.ne.jp",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1E9}\x{1F1EA} DE",
-                 live       => 1,
-                 name       => "librarian.pussthecat.org",
-                 url        => "https://librarian.pussthecat.org",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1EB}\x{1F1F7} FR",
-                 live       => 1,
-                 name       => "lbry.projectsegfau.lt",
-                 url        => "https://lbry.projectsegfau.lt",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1E8}\x{1F1E6} CA",
-                 live       => 0,
-                 name       => "librarian.esmailelbob.xyz",
-                 url        => "https://librarian.esmailelbob.xyz",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1E8}\x{1F1E6} CA",
-                 live       => 0,
-                 name       => "lbry.vern.cc",
-                 url        => "https://lbry.vern.cc",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1FA}\x{1F1F8} US",
-                 live       => 0,
-                 name       => "lbry.slipfox.xyz",
-                 url        => "https://lbry.slipfox.xyz",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1F2}\x{1F1E9} MD",
-                 live       => 0,
-                 name       => "lbry.sytes.net",
-                 url        => "https://lbry.sytes.net",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1E8}\x{1F1FF} CZ",
-                 live       => 1,
-                 name       => "lbry.webhop.me",
-                 url        => "https://lbry.webhop.me",
-                },
-                {
-                 cloudflare => 0,
-                 country    => "\x{1F1F7}\x{1F1FA} RU",
-                 live       => 0,
-                 name       => "lbry.mywire.org",
-                 url        => "https://lbry.mywire.org",
-                },
-               ];
+        return $self->_static_librarian_instances();
     }
 
     return $result->{instances};
@@ -653,7 +659,7 @@ sub get_librarian_instances {
 sub select_good_librarian_instances {
     my ($self, %args) = @_;
 
-    state $instances = $self->get_librarian_instances();
+    state $instances = $self->get_librarian_instances() // $self->_static_librarian_instances;
 
     ref($instances) eq 'ARRAY' or return;
 
@@ -794,7 +800,18 @@ sub get_librarian_url {
             print STDERR ":: Changed the instance to: $host\n" if $self->get_debug;
         }
         else {
-            $host = "https://lbry.bcow.xyz";
+
+            my @fallback_instances = qw(
+              librarian.esmailelbob.xyz
+              lbry.projectsegfau.lt
+              lbry.vern.cc
+              lbry.slipfox.xyz
+              lbry.mywire.org
+              lbry.ooguy.com
+              lbn.frail.duckdns.org
+            );
+
+            $host = "https://" . $fallback_instances[int rand scalar @fallback_instances];
             $self->set_api_host($host);
             print STDERR ":: Failed to change the instance. Using: $host\n" if $self->get_debug;
         }

@@ -15,7 +15,7 @@
 #-------------------------------------------------------
 #  GTK Lbry Viewer
 #  Fork: 27 May 2022
-#  Edit: 30 November 2022
+#  Edit: 25 January 2023
 #  https://github.com/trizen/lbry-viewer
 #-------------------------------------------------------
 
@@ -211,7 +211,6 @@ my %CONFIG = (
     get_streaming_urls_in_parallel => 0,
 
     # LBRY options
-    split_videos   => 1,
     prefer_mp4     => 0,
     prefer_av1     => 0,
     ignore_av1     => 0,
@@ -3527,8 +3526,6 @@ sub get_streaming_url {
 
         hfr        => $CONFIG{hfr},
         ignore_av1 => $CONFIG{ignore_av1},
-
-        split      => $CONFIG{split_videos},
         prefer_m4a => $CONFIG{prefer_m4a},
 
         ignored_projections => $CONFIG{ignored_projections},

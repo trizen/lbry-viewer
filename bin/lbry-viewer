@@ -15,7 +15,7 @@
 #-------------------------------------------------------
 #  lbry-viewer
 #  Fork: 27 May 2022
-#  Edit: 30 November 2022
+#  Edit: 25 January 2023
 #  https://github.com/trizen/lbry-viewer
 #-------------------------------------------------------
 
@@ -202,8 +202,6 @@ my %CONFIG = (
         ? 'vlc'
         : undef    # auto-defined
     ),
-
-    split_videos => $constant{android} ^ 1,
 
     # LBRY options
     maxResults      => 20,
@@ -554,22 +552,6 @@ sub load_config {
         $update_config = 1;
     }
 
-    # Merge into MKV if ffmpeg is installed
-    if (not defined $CONFIG{merge_into_mkv}) {
-
-        my $ffmpeg_path = which_command('ffmpeg');
-
-        if (defined($ffmpeg_path)) {
-            $CONFIG{ffmpeg_cmd}     = $ffmpeg_path;
-            $CONFIG{merge_into_mkv} = 1;
-        }
-        else {
-            $CONFIG{merge_into_mkv} = 0;
-        }
-
-        $update_config = 1;
-    }
-
     # Enable history if Term::ReadLine::Gnu::XS is installed
     if (not defined $CONFIG{history}) {
 
@@ -797,8 +779,6 @@ usage: $execname [options] ([url] | [keywords])
        --downloads-dir=s : downloads directory (set: '$opt{downloads_dir}')
        --filename=s      : set a custom format for the video filename (see: -T)
        --fat32safe!      : makes filenames FAT32 safe (includes Unicode)
-       --mkv-merge!      : merge audio and video into an MKV container
-       --merge-captions! : include closed-captions in the MKV container
 
  * Convert
    --convert-cmd=s      : command for converting videos after download
@@ -863,7 +843,6 @@ usage: $execname [options] ([url] | [keywords])
    --proxy=s            : set HTTP(S)/SOCKS proxy: 'proto://domain.tld:port/'
                           If authentication is required,
                           use 'proto://user:pass\@domain.tld:port/'
-   --split-videos!      : include or exclude the itags for split videos
    --ytdl!              : use youtube-dl for extracting streaming URLs
    --ytdl-cmd=s         : yt-dlp / youtube-dl command (default: $CONFIG{ytdl_cmd})
 
@@ -1503,7 +1482,6 @@ sub parse_arguments {
         # Others
         'captions!'        => \$opt{videoCaption},
         'fullscreen|fs|f!' => \$opt{fullscreen},
-        'split-videos!'    => \$opt{split_videos},
         'confirm!'         => \$opt{confirm},
 
         'prefer-mp4!' => \$opt{prefer_mp4},
@@ -1515,9 +1493,6 @@ sub parse_arguments {
         'custom-layout-format=s'          => \$opt{custom_layout_format},
         'custom-channel-layout-format=s'  => \$opt{custom_channel_layout_format},
         'custom-playlist-layout-format=s' => \$opt{custom_playlist_layout_format},
-
-        'merge-into-mkv|mkv-merge!'           => \$opt{merge_into_mkv},
-        'merge-with-captions|merge-captions!' => \$opt{merge_with_captions},
 
         'api-host|instance=s' => \$opt{api_host},
 
@@ -3264,25 +3239,12 @@ sub get_streaming_url {
     require WWW::LbryViewer::Itags;
     state $yv_itags = WWW::LbryViewer::Itags->new();
 
-    # Include split-videos
-    my $split_videos = 1;
-
-    # Exclude split-videos in download-mode or when no video output is required
-    if ($opt{novideo} or not $opt{split_videos}) {
-        $split_videos = 0;
-    }
-    elsif ($opt{download_video}) {
-        $split_videos = $opt{merge_into_mkv} ? 1 : 0;
-    }
-
     my ($streaming, $resolution) = $yv_itags->find_streaming_url(
         urls       => $urls,
         resolution => ($opt{novideo} ? 'audio' : $opt{resolution}),
 
         hfr        => $opt{hfr},
         ignore_av1 => $opt{ignore_av1},
-
-        split      => $split_videos,
         prefer_m4a => $opt{prefer_m4a},
 
         ignored_projections => $opt{ignored_projections},
@@ -4383,8 +4345,6 @@ See also:
 
 When downloading a video, copy the closed-caption (if any) into the same folder with the video.
 
-If C<merge_into_mkv> and C<merge_with_captions> are both enabled, there is no need to enable this option.
-
 =head2 custom_layout_format
 
 An array of hash values specifying a custom layout for video results.
@@ -4546,20 +4506,6 @@ How many results to display per page.
 
 Currently, this is not implemented.
 
-=head2 merge_into_mkv
-
-When downloading split videos, merge the audio+video files into an MKV container.
-
-Requires C<ffmpeg>.
-
-=head2 merge_into_mkv_args
-
-Arguments for C<ffmpeg> how to merge the files.
-
-=head2 merge_with_captions
-
-Include closed-captions inside the MKV container (if any).
-
 =head2 nsfw
 
 Include or exclude NSFW videos in search results.
@@ -4621,10 +4567,6 @@ When downloading, skip if the file already exists locally.
 =head2 skip_watched
 
 Skip already watched/downloaded videos.
-
-=head2 split_videos
-
-Enable or disable support for split-videos. Split-videos are videos that do not include audio and video in the same file.
 
 =head2 srt_languages
 

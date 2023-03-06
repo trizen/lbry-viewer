@@ -306,7 +306,7 @@ sub _extract_itemSection_entry {
 
         foreach my $entry (@{$info}) {
 
-            if ($entry->{'-class'} eq 'thumbnailWrapper' or $entry->{'-class'} eq 'relVid__thumbnailWrapper') {
+            if (($entry->{'-class'} // '') eq 'thumbnailWrapper' or ($entry->{'-class'} // '') eq 'relVid__thumbnailWrapper') {
                 my $link = $entry->{a}[0];
                 $video{videoId}         = (($link->{'-href'} // '') =~ s{^/}{}r);
                 $video{videoThumbnails} = $self->_extract_thumbnails($link->{img});
@@ -317,7 +317,7 @@ sub _extract_itemSection_entry {
                 }
             }
 
-            if ($entry->{'-class'} eq 'claimMeta' or $entry->{'-class'} eq 'relVid__meta') {
+            if (($entry->{'-class'} // '') eq 'claimMeta' or ($entry->{'-class'} // '') eq 'relVid__meta') {
                 $is_video = 1;
                 my $p = $entry->{p};
                 $video{publishedText} = _extract_published_text($p->[0]{'#text'});
@@ -375,7 +375,7 @@ sub _extract_itemSection_entry {
         my $links = $data->{p};
 
         foreach my $entry (@{$info}) {
-            if ($entry->{'-class'} eq 'thumbnailWrapper') {
+            if (($entry->{'-class'} // '') eq 'thumbnailWrapper') {
                 my $link = $entry->{a}[0];
                 $channel{authorId}         = (($link->{'-href'} // '') =~ s{^/}{}r);
                 $channel{authorThumbnails} = $self->_extract_thumbnails($link->{img});

@@ -5,6 +5,12 @@
 
 [CHANGELOG]
 
+Version 0.0.9
+
+- CLI: added basic support for Android, for playing videos with the VLC player.
+- Updated the list of fallback Librarian instances.
+- Fixed the list of fallback Librarian instances, when the `instances.json` file cannot be retrieved.
+
 Version 0.0.8
 
 - CLI: allow the `--novideo` option to be negated.

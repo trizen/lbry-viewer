@@ -561,16 +561,15 @@ sub default_channels {
     my ($self) = @_;
 
     my %channels = (
-                    '@ComputingForever:9'   => 'Computing Forever',
-                    '@veritasium:f'         => 'Veritasium',
-                    '@3Blue1Brown:b'        => '3Blue1Brown',
-                    '@DistroTube:2'         => 'DistroTube',
-                    '@AlphaNerd:8'          => 'Mental Outlaw',
-                    '@TheLinuxExperiment:e' => 'The Linux Experiment',
-                    '@techlore:3'           => 'Techlore',
-                    '@RobBraxmanTech:6'     => 'Rob Braxman Tech',
-                    '@gotbletu'             => 'gotbletu',
-                    '@academyofideas'       => 'Academy of Ideas',
+                    '@ComputingForever:9' => 'Computing Forever',
+                    '@veritasium:f'       => 'Veritasium',
+                    '@3Blue1Brown:b'      => '3Blue1Brown',
+                    '@DistroTube:2'       => 'DistroTube',
+                    '@AlphaNerd:8'        => 'Mental Outlaw',
+                    '@techlore:3'         => 'Techlore',
+                    '@RobBraxmanTech:6'   => 'Rob Braxman Tech',
+                    '@gotbletu'           => 'gotbletu',
+                    '@academyofideas'     => 'Academy of Ideas',
                    );
 
     my @channels = map { [$_, $channels{$_}] } keys %channels;

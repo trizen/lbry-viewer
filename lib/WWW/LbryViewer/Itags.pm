@@ -48,6 +48,7 @@ sub get_itags {
                    {value => 'hls-3660', format => 'mp4'},
                    {value => 'hls-316',  format => 'mp4'},
                    {value => 'hls-4432', format => 'mp4'},
+                   {value => 'hls-0',    format => 'mp4'},    # may not be 1080p
                   ],
 
         '720' => [{value => "720p",     format => 'mp4'},
@@ -58,6 +59,7 @@ sub get_itags {
                   {value => "hls-2890", format => 'mp4'},
                   {value => "hls-3300", format => 'mp4'},
                   {value => "hls-1460", format => 'mp4'},
+                  {value => "hls-1",    format => 'mp4'},    # may not be 720p
                  ],
 
         '480' => [{value => "480p", format => 'mp4'}, {value => "hls-1567", format => 'mp4'},],
@@ -69,6 +71,7 @@ sub get_itags {
                   {value => "hls-655",   format => 'mp4'},
                   {value => "hls-215",   format => 'mp4'},
                   {value => "hls-525",   format => 'mp4'},
+                  {value => "hls-2",     format => 'mp4'},    # may not be 360p
                  ],
 
         '240' => [{value => "240p", format => 'mp4'},],

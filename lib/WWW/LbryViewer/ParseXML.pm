@@ -66,17 +66,17 @@ sub xml2hash {
                   ? ref $ref->{$tag}
                       ? $ref->{$tag}
                       : (
-                       defined $ref->{$tag}
-                       ? ($ref->{$tag} = [$ref->{$tag}])
-                       : ($ref->{$tag} //= [])
-                      )
+                         defined $ref->{$tag}
+                         ? ($ref->{$tag} = [$ref->{$tag}])
+                         : ($ref->{$tag} //= [])
+                        )
                   : ref $ref eq 'ARRAY' ? ref $ref->[-1]{$tag}
                       ? $ref->[-1]{$tag}
                       : (
-                       defined $ref->[-1]{$tag}
-                       ? ($ref->[-1]{$tag} = [$ref->[-1]{$tag}])
-                       : ($ref->[-1]{$tag} //= [])
-                      )
+                         defined $ref->[-1]{$tag}
+                         ? ($ref->[-1]{$tag} = [$ref->[-1]{$tag}])
+                         : ($ref->[-1]{$tag} //= [])
+                        )
                   : [];
 
                 ++$#{$ref} if ref $ref eq 'ARRAY';
@@ -141,17 +141,17 @@ sub xml2hash {
                       ? ref $ref->{$tag}
                           ? $ref->{$tag}
                           : (
-                           defined $ref->{$tag}
-                           ? ($ref->{$tag} = [$ref->{$tag}])
-                           : ($ref->{$tag} //= [])
-                          )
+                             defined $ref->{$tag}
+                             ? ($ref->{$tag} = [$ref->{$tag}])
+                             : ($ref->{$tag} //= [])
+                            )
                       : ref $ref eq 'ARRAY' ? ref $ref->[-1]{$tag}
                           ? $ref->[-1]{$tag}
                           : (
-                           defined $ref->[-1]{$tag}
-                           ? ($ref->[-1]{$tag} = [$ref->[-1]{$tag}])
-                           : ($ref->[-1]{$tag} //= [])
-                          )
+                             defined $ref->[-1]{$tag}
+                             ? ($ref->[-1]{$tag} = [$ref->[-1]{$tag}])
+                             : ($ref->[-1]{$tag} //= [])
+                            )
                       : [];
 
                     ++$#{$ref} if ref $ref eq 'ARRAY';
@@ -184,17 +184,17 @@ sub xml2hash {
                           ? ref $ref->{$tag}
                               ? $ref->{$tag}
                               : (
-                               defined $ref->{$tag}
-                               ? ($ref->{$tag} = [$ref->{$tag}])
-                               : ($ref->{$tag} //= [])
-                              )
+                                 defined $ref->{$tag}
+                                 ? ($ref->{$tag} = [$ref->{$tag}])
+                                 : ($ref->{$tag} //= [])
+                                )
                           : ref $ref eq 'ARRAY' ? ref $ref->[-1]{$tag}
                               ? $ref->[-1]{$tag}
                               : (
-                               defined $ref->[-1]{$tag}
-                               ? ($ref->[-1]{$tag} = [$ref->[-1]{$tag}])
-                               : ($ref->[-1]{$tag} //= [])
-                              )
+                                 defined $ref->[-1]{$tag}
+                                 ? ($ref->[-1]{$tag} = [$ref->[-1]{$tag}])
+                                 : ($ref->[-1]{$tag} //= [])
+                                )
                           : [];
 
                         ++$#{$ref} if ref $ref eq 'ARRAY';

@@ -186,7 +186,7 @@ sub _extract_published_date {
 
 sub _extract_channel_id {
     my ($info) = @_;
-    eval      { $info->{channelId} }
+    eval { $info->{channelId} }
       // eval { $info->{shortBylineText}{runs}[0]{navigationEndpoint}{browseEndpoint}{browseId} }
       // eval { $info->{navigationEndpoint}{browseEndpoint}{browseId} };
 }
@@ -242,15 +242,11 @@ sub _extract_playlist_thumbnail {
     my ($self, $info) = @_;
     eval {
         $self->_fix_url_protocol(
-                         (
-                          grep { _thumbnail_quality($_->{width}) =~ /medium|high/ }
-                            @{$info->{thumbnailRenderer}{playlistVideoThumbnailRenderer}{thumbnail}{thumbnails}}
-                         )[0]{url} // $info->{thumbnailRenderer}{playlistVideoThumbnailRenderer}{thumbnail}{thumbnails}[0]{url}
-        );
+                (grep { _thumbnail_quality($_->{width}) =~ /medium|high/ } @{$info->{thumbnailRenderer}{playlistVideoThumbnailRenderer}{thumbnail}{thumbnails}})
+                [0]{url} // $info->{thumbnailRenderer}{playlistVideoThumbnailRenderer}{thumbnail}{thumbnails}[0]{url});
     } // eval {
-        $self->_fix_url_protocol(
-                          (grep { _thumbnail_quality($_->{width}) =~ /medium|high/ } @{$info->{thumbnail}{thumbnails}})[0]{url}
-                            // $info->{thumbnail}{thumbnails}[0]{url});
+        $self->_fix_url_protocol((grep { _thumbnail_quality($_->{width}) =~ /medium|high/ } @{$info->{thumbnail}{thumbnails}})[0]{url}
+                                 // $info->{thumbnail}{thumbnails}[0]{url});
     };
 }
 

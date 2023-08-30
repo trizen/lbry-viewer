@@ -215,7 +215,7 @@ my %CONFIG = (
     prefer_av1     => 0,
     ignore_av1     => 0,
     prefer_m4a     => 0,
-    force_fallback => 0,
+    force_fallback => 1,
     maxResults     => 10,
     hfr            => 1,        # true to prefer high frame rate (HFR) videos
     resolution     => 'best',
@@ -855,12 +855,10 @@ if (not $CONFIG{video_player_selected}) {
 # Locate a terminal
 if (not defined $CONFIG{terminal}) {
     foreach my $term (
-                      'gnome-terminal', 'lxterminal', 'terminal', 'xfce4-terminal',
-                      'sakura',         'st',         'lilyterm', 'evilvte',
-                      'superterm',      'terminator', 'kterm',    'mlterm',
-                      'mrxvt',          'rxvt',       'urxvt',    'termite',
-                      'termit',         'fbterm',     'stjerm',   'yakuake',
-                      'tilix',          'roxterm',    'xterm',
+                      'gnome-terminal', 'lxterminal', 'terminal',  'xfce4-terminal', 'sakura', 'st',
+                      'lilyterm',       'evilvte',    'superterm', 'terminator',     'kterm',  'mlterm',
+                      'mrxvt',          'rxvt',       'urxvt',     'termite',        'termit', 'fbterm',
+                      'stjerm',         'yakuake',    'tilix',     'roxterm',        'xterm',
       ) {
         if (defined(my $abs_path = which_command($term))) {
             $CONFIG{terminal} = $abs_path;
@@ -3090,9 +3088,7 @@ sub display_results {
                             my $thumbnail_url = $row->{url};
                             my $square_format = $yv_utils->is_channel($entry) || $yv_utils->is_subscription($entry);
 
-                            my $pixbuf =
-                              get_pixbuf_thumbnail_from_content($thumbnail_data, $thumbnail_url,
-                                                                ($square_format ? (160, 160) : ()));
+                            my $pixbuf = get_pixbuf_thumbnail_from_content($thumbnail_data, $thumbnail_url, ($square_format ? (160, 160) : ()));
                             $liststore->set($iter, [1], [$pixbuf]);
                         }
                     }
@@ -3252,8 +3248,8 @@ sub add_video_entry {
                                     . join(
                                            "\n",
                                            map { sprintf("%s   %s", $_->[0], $_->[1]) } grep { defined($_->[1]) } (
-                                               [$symbols{author}    => encode_entities($yv_utils->get_channel_title($video))],
-                                               [$symbols{published} => ($yv_utils->get_publication_date($video) // 'unknown')],
+                                                                                [$symbols{author}    => encode_entities($yv_utils->get_channel_title($video))],
+                                                                                [$symbols{published} => ($yv_utils->get_publication_date($video) // 'unknown')],
                                            )
                                           )
                                     . "\n\n"
@@ -3261,14 +3257,11 @@ sub add_video_entry {
                                  );
 
     my $info_label = reflow_text(
-                                 join(
-                                      "\n",
-                                      map { sprintf("%s   %s", $_->[0], $_->[1]) } grep { defined($_->[1]) } (
-                                                   [$symbols{play}  => $yv_utils->get_time($video)],
-                                                   [$symbols{views} => $yv_utils->set_thousands($yv_utils->get_views($video))],
-                                      )
-                                     )
-                                );
+                         join("\n",
+                              map { sprintf("%s   %s", $_->[0], $_->[1]) }
+                                grep { defined($_->[1]) }
+                                ([$symbols{play} => $yv_utils->get_time($video)], [$symbols{views} => $yv_utils->set_thousands($yv_utils->get_views($video))],))
+    );
 
     $liststore->set(
                     $iter,
@@ -3875,16 +3868,9 @@ sub play_selected_video_with_cli_lbry_viewer {
 sub execute_cli_lbry_viewer {
     my @arguments = @_;
 
-    my $command = join(
-                       q{ },
-                       $CONFIG{terminal},
-                       sprintf(
-                               $CONFIG{terminal_exec},
-                               join(q{ },
-                                    $CONFIG{lbry_viewer}, get_options_as_arguments(),
-                                    @arguments,           @{$CONFIG{lbry_viewer_args}}),
-                              )
-                      );
+    my $command = join(q{ },
+                      $CONFIG{terminal},
+                      sprintf($CONFIG{terminal_exec}, join(q{ }, $CONFIG{lbry_viewer}, get_options_as_arguments(), @arguments, @{$CONFIG{lbry_viewer_args}}),));
     my $code = execute_external_program($command);
 
     say $command if $yv_obj->get_debug;
@@ -3961,10 +3947,11 @@ sub send_comment_to_video {
     my $videoID = get_selected_entry_code(type => 'video') // return;
     my $comment = get_text($gui->get_object('comment_textview'));
 
-    $feeds_statusbar->push(0,
-                           length($comment) && $yv_obj->comment_to_video_id($comment, $videoID)
+    $feeds_statusbar->push(
+                           0, length($comment) && $yv_obj->comment_to_video_id($comment, $videoID)
                            ? 'Video comment has been posted!'
-                           : 'Error!');
+                           : 'Error!'
+                          );
 }
 
 sub wrap_text {
@@ -4004,18 +3991,18 @@ sub display_comments {
         }
 
         my $comment_text = reflow_text(
-                                      sprintf(
-                                              "<big><b>%s</b> (%s) commented:</big>\n%s",
-                                              encode_entities($yv_utils->get_author($comment)),
-                                              $comment_age,
-                                              encode_entities(
-                                                  wrap_text(
-                                                      i_tab => "\t",
-                                                      s_tab => "\t",
-                                                      text => [$yv_utils->get_comment_content($comment) // 'Empty comment...'],
-                                                  )
-                                              ),
-                                             )
+                                       sprintf(
+                                               "<big><b>%s</b> (%s) commented:</big>\n%s",
+                                               encode_entities($yv_utils->get_author($comment)),
+                                               $comment_age,
+                                               encode_entities(
+                                                               wrap_text(
+                                                                         i_tab => "\t",
+                                                                         s_tab => "\t",
+                                                                         text  => [$yv_utils->get_comment_content($comment) // 'Empty comment...'],
+                                                                        )
+                                                              ),
+                                              )
                                       );
 
         if (not $comment->{_hidden}) {
@@ -4043,18 +4030,18 @@ sub display_comments {
                 }
 
                 my $reply_text = reflow_text(
-                                          sprintf(
-                                                  "\t<big><b>%s</b> (%s) replied:</big>\n%s",
-                                                  encode_entities($yv_utils->get_author($reply)),
-                                                  $reply_age,
-                                                  encode_entities(
-                                                      wrap_text(
-                                                          i_tab => "\t\t",
-                                                          s_tab => "\t\t",
-                                                          text => [$yv_utils->get_comment_content($reply) // 'Empty reply...'],
-                                                      )
-                                                  ),
-                                                 )
+                                             sprintf(
+                                                     "\t<big><b>%s</b> (%s) replied:</big>\n%s",
+                                                     encode_entities($yv_utils->get_author($reply)),
+                                                     $reply_age,
+                                                     encode_entities(
+                                                                     wrap_text(
+                                                                               i_tab => "\t\t",
+                                                                               s_tab => "\t\t",
+                                                                               text  => [$yv_utils->get_comment_content($reply) // 'Empty reply...'],
+                                                                              )
+                                                                    ),
+                                                    )
                                             );
 
                 my $iter = $feeds_liststore->append;
@@ -4215,7 +4202,7 @@ sub set_entry_details {
 
         $text_info = join(
             "\n",
-            map    { sprintf("%s  %s", $_->[0], $_->[1]) }
+            map { sprintf("%s  %s", $_->[0], $_->[1]) }
               grep { $_->[1] !~ /^(0|unknown)\z/i }
               grep { defined($_->[1]) } (
                 [$symbols{author}      => $yv_utils->get_channel_title($info)],

@@ -1499,7 +1499,7 @@ sub parse_arguments {
         'prefer-m4a!'                       => \$opt{prefer_m4a},
         'filename|filename-format=s'        => \$opt{video_filename_format},
         'rp|rem-played|remove-played-file!' => \$opt{remove_played_file},
-        'info|i|video-info=s'               => \$opt{print_video_info},
+        'info|i=s'                          => \$opt{print_video_info},
         'get-term-width!'                   => \$opt{get_term_width},
         'page=i'                            => \$opt{page},
         'novideo|no-video|n!'               => \$opt{novideo},

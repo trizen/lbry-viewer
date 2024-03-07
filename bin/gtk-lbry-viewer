@@ -27,40 +27,44 @@ use 5.016;
 
 use warnings;
 no warnings 'once';
-
-my $DEVEL;                                           # true in devel mode
-use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel only
-
 use List::Util qw(min max);
-use WWW::LbryViewer v0.0.9;
-use WWW::LbryViewer::RegularExpressions;
 
+use Storable              qw();
 use Gtk3                  qw(-init);
 use File::Spec::Functions qw(
   rel2abs
   catdir
   catfile
   curdir
-  updir
   path
-  tmpdir
+  splitdir
   file_name_is_absolute
 );
 
-require Storable;
+my $DEVEL;
+BEGIN { $DEVEL = -w __FILE__ }
+
+sub devel_path {
+    require FindBin;
+    my @dirs = splitdir($FindBin::RealBin);
+    pop(@dirs);
+    return @dirs;
+}
+
+use if $DEVEL, lib => $DEVEL && catdir(devel_path(), 'lib');
+
+use WWW::LbryViewer v0.0.9;
+use WWW::LbryViewer::RegularExpressions;
+
 binmode(STDOUT, ':utf8');
 
 my $appname = 'GTK+ Lbry Viewer';
 my $version = $WWW::LbryViewer::VERSION;
 
-# Saved and subscribed channels
-my %channels;
-my %subscribed_channels;
-
 # Share directory
 my $share_dir =
-  ($DEVEL and -d "../share")
-  ? '../share'
+  ($DEVEL and -d catdir(devel_path(), 'share'))
+  ? catdir(devel_path(), 'share')
   : do { require File::ShareDir; File::ShareDir::dist_dir('WWW-LbryViewer') };
 
 # Configuration dir/file
@@ -87,6 +91,10 @@ else {
 
     $xdg_config_home = catdir($home_dir, '.config');
 }
+
+# Saved and subscribed channels
+my %channels;
+my %subscribed_channels;
 
 # Configuration dirs
 my $config_dir          = catdir($xdg_config_home, 'lbry-viewer');

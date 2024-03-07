@@ -43,22 +43,32 @@ use 5.016;
 use warnings;
 no warnings 'once';
 
-my $DEVEL;                                           # true in devel mode
-use if ($DEVEL = -w __FILE__), lib => qw(../lib);    # devel mode
-
-use WWW::LbryViewer v0.0.9;
-use WWW::LbryViewer::RegularExpressions;
-
-require Storable;
-
+use Storable              qw();
+use Term::ReadLine        qw();
 use File::Spec::Functions qw(
   catdir
   catfile
   curdir
   path
   rel2abs
+  splitdir
   file_name_is_absolute
 );
+
+my $DEVEL;
+BEGIN { $DEVEL = -w __FILE__ }
+
+sub devel_path {
+    require FindBin;
+    my @dirs = splitdir($FindBin::RealBin);
+    pop(@dirs);
+    return @dirs;
+}
+
+use if $DEVEL, lib => $DEVEL && catdir(devel_path(), 'lib');
+
+use WWW::LbryViewer v0.0.9;
+use WWW::LbryViewer::RegularExpressions;
 
 binmode(STDOUT, ':utf8');
 
@@ -67,7 +77,6 @@ my $version  = $WWW::LbryViewer::VERSION;
 my $execname = 'lbry-viewer';
 
 # A better <STDIN> support:
-require Term::ReadLine;
 my $term = Term::ReadLine->new("$appname $version");
 
 # Options (key=>value) goes here

@@ -36,7 +36,7 @@ our $get_username_videos_re    = qr{^.*/user/(?<username>[-.\w]+)};
 our $get_username_playlists_re = qr{$get_username_videos_re/playlists};
 
 # Video ID
-my $video_id_re = qr{(?>\@(?>[^/]+/[^/]+|[^/]+)|[^/]+[/:][a-f0-9]{40}\b)};
+my $video_id_re = qr{(?>\@(?>[^/]+/[^/]+|[^/]+)|[^/]+[/:][a-f0-9]{40}\b|[^/]+:[0-9]+\b)};
 our $valid_video_id_re = qr{^$video_id_re\z};
 our $get_video_id_re   = qr{/(?<video_id>$video_id_re)$};
 

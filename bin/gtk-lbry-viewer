@@ -1,6 +1,6 @@
 #!/usr/bin/perl
 
-# Copyright (C) 2010-2023 Trizen <echo dHJpemVuQHByb3Rvbm1haWwuY29tCg== | base64 -d>.
+# Copyright (C) 2010-2024 Trizen <echo dHJpemVuQHByb3Rvbm1haWwuY29tCg== | base64 -d>.
 #
 # This program is free software; you can redistribute it and/or modify it
 # under the terms of either: the GNU General Public License as published
@@ -15,7 +15,7 @@
 #-------------------------------------------------------
 #  GTK Lbry Viewer
 #  Fork: 27 May 2022
-#  Edit: 06 March 2023
+#  Edit: 12 May 2024
 #  https://github.com/trizen/lbry-viewer
 #-------------------------------------------------------
 
@@ -53,7 +53,7 @@ sub devel_path {
 
 use if $DEVEL, lib => $DEVEL && catdir(devel_path(), 'lib');
 
-use WWW::LbryViewer v0.0.9;
+use WWW::LbryViewer v0.1.0;
 use WWW::LbryViewer::RegularExpressions;
 
 binmode(STDOUT, ':utf8');
@@ -190,13 +190,13 @@ my %CONFIG = (
                               cmd => q{vlc},
                               srt => q{--sub-file=*SUB*},
                               fs  => q{--fullscreen},
-                              arg => q{--quiet --play-and-exit --no-video-title-show --input-title-format=*TITLE*},
+                              arg => q{--quiet --play-and-exit --no-video-title-show --input-title-format=*TITLE* *URL*},
                              },
                       mpv => {
                               cmd => q{mpv},
                               srt => q{--sub-file=*SUB*},
                               fs  => q{--fullscreen},
-                              arg => q{--really-quiet --force-media-title=*TITLE* --no-terminal},
+                              arg => q{--really-quiet --force-media-title=*TITLE* --no-terminal *URL*},
                              },
                      },
     video_player_selected => undef,    # autodetect it later

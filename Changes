@@ -5,6 +5,12 @@
 
 [CHANGELOG]
 
+Version 0.1.0
+
+- GUI: added "Backward" and "Forward" buttons for navigating the history.
+- Fixed the downloading of videos with very long titles.
+- Other minor fixes.
+
 Version 0.0.9
 
 - CLI: added basic support for Android, for playing videos with the VLC player.

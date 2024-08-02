@@ -3273,7 +3273,7 @@ sub download_from_url {
 
     # Download with yt-dlp / youtube-dl
     if ($opt{ytdl} and $opt{download_with_ytdl} and defined($info->{_lbry_url}) and defined($info->{itag})) {
-        my $cmd = join(' ', $opt{ytdl_cmd}, '-f', $info->{itag}, quotemeta($info->{_lbry_url}), '-o', quotemeta("$output_filename.part"));
+        my $cmd = join(' ', $opt{ytdl_cmd}, '-f', "$info->{itag}/bestvideo", quotemeta($info->{_lbry_url}), '-o', quotemeta("$output_filename.part"));
         $yv_obj->proxy_system($cmd);
         return if $?;
         rename("$output_filename.part", $output_filename) or return undef;

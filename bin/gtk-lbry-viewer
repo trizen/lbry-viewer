@@ -241,9 +241,9 @@ my %CONFIG = (
 
     # URI options
     thumbnail_type    => 'medium',
-    lbry_video_url    => 'https://open.lbry.com/%s',
-    lbry_playlist_url => 'https://open.lbry.com/%s',
-    lbry_channel_url  => 'https://open.lbry.com/%s',
+    lbry_video_url    => 'https://odysee.com/%s',
+    lbry_playlist_url => 'https://odysee.com/%s',
+    lbry_channel_url  => 'https://odysee.com/%s',
 
     # Subtitle options
     srt_languages => ['en', 'es'],
@@ -3819,7 +3819,7 @@ sub make_lbry_url {
         return sprintf($format, $code);
     }
 
-    return "https://open.lbry.com";    # should not happen
+    return "https://odysee.com";    # should not happen
 }
 
 sub open_external_url {

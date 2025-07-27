@@ -22,7 +22,6 @@ The application is in the early stages of development. Some functionality is not
 ### AVAILABILITY
 
 * Arch Linux (AUR): https://aur.archlinux.org/packages/lbry-viewer-git/
-* Debian/Ubuntu (MPR): Latest stable version https://mpr.makedeb.org/packages/lbry-viewer .Latest dev version https://mpr.makedeb.org/packages/lbry-viewer-git . MPR is like the AUR, but for Debian/Ubuntu. You need to install makedeb first https://www.makedeb.org/ .
 
 ### TRY
 
